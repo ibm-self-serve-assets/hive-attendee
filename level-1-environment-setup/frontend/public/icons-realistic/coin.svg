@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">Gold hive coin with a navy bee</title>
+  <circle cx="128" cy="128" r="118" fill="#E5A51A"/>
+  <circle cx="128" cy="128" r="106" fill="#FFD45A"/>
+  <g fill="#082449">
+    <path d="M112 83 102 65a5 5 0 0 1 9-5l10 19zm23-4 10-19a5 5 0 0 1 9 5l-10 18z"/>
+    <circle cx="128" cy="94" r="19"/>
+    <path d="M105 127C91 108 66 104 57 118c-9 15 2 38 38 40l12-15zm46 0c14-19 39-23 48-9 9 15-2 38-38 40l-12-15z"/>
+    <path d="M128 116c-21 0-32 16-32 37 0 28 18 45 32 53 14-8 32-25 32-53 0-21-11-37-32-37z"/>
+  </g>
+  <path d="M97 142h62v12H97zm6 26h50l-6 12h-38z" fill="#FFD45A"/>
+</svg>

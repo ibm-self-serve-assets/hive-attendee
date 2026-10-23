@@ -1,0 +1,19 @@
+/* Scoped to the chevrons; does not style the station or any controls. */
+.hive-chevrons .hive-chevron {
+  opacity: var(--hive-inactive-opacity, 1);
+}
+.hive-chevrons[data-active="true"] .hive-chevron {
+  opacity: .55;
+  animation: hive-chevron-pulse 2s ease-in-out infinite;
+}
+@keyframes hive-chevron-pulse {
+  0%, 12%, 65%, 100% { opacity: .55; }
+  32% { opacity: 1; }
+}
+/* Respect the user's motion preference while retaining bright active icons. */
+@media (prefers-reduced-motion: reduce) {
+  .hive-chevrons[data-active="true"] .hive-chevron {
+    animation: none;
+    opacity: 1;
+  }
+}

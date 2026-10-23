@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="Hive Robotics">
+  <!-- Gold coin -->
+  <circle cx="90" cy="90" r="84" fill="#E5A51A"/>
+  <circle cx="90" cy="90" r="75" fill="#FFD45A"/>
+  <!-- Navy bee (scaled from coin.svg 256→180, ~0.7x) -->
+  <!-- Antennae -->
+  <path d="M79 59 71 46a3.5 3.5 0 0 1 6-4l9 13z" fill="#082449"/>
+  <path d="M95 56 104 43a3.5 3.5 0 0 1 6 4l-9 13z" fill="#082449"/>
+  <!-- Head -->
+  <circle cx="90" cy="66" r="14" fill="#082449"/>
+  <!-- Wings -->
+  <path d="M74 90C63 75 45 73 40 83c-6 10 1 27 27 28l8-11z" fill="#082449" opacity="0.6"/>
+  <path d="M106 90c11-15 29-17 34-7 6 10-1 27-27 28l-8-11z" fill="#082449" opacity="0.6"/>
+  <!-- Body -->
+  <path d="M90 81c-15 0-23 11-23 26 0 20 13 32 23 37 10-5 23-17 23-37 0-15-8-26-23-26z" fill="#082449"/>
+  <!-- Stripes -->
+  <rect x="70" y="99" width="40" height="9" rx="3" fill="#FFD45A"/>
+  <rect x="72" y="112" width="36" height="9" rx="3" fill="#FFD45A"/>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" role="img" aria-label="Hive Robotics">
+  <!-- Gold coin background -->
+  <circle cx="16" cy="16" r="15" fill="#E5A51A"/>
+  <circle cx="16" cy="16" r="13" fill="#FFD45A"/>
+  <!-- Navy bee body -->
+  <!-- Antennae -->
+  <line x1="14" y1="10" x2="11" y2="7" stroke="#082449" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="18" y1="10" x2="21" y2="7" stroke="#082449" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="11" cy="6.5" r="1.2" fill="#082449"/>
+  <circle cx="21" cy="6.5" r="1.2" fill="#082449"/>
+  <!-- Head -->
+  <circle cx="16" cy="11" r="3" fill="#082449"/>
+  <!-- Wings -->
+  <ellipse cx="10.5" cy="15" rx="3.5" ry="2" fill="#082449" opacity="0.55"/>
+  <ellipse cx="21.5" cy="15" rx="3.5" ry="2" fill="#082449" opacity="0.55"/>
+  <!-- Body -->
+  <ellipse cx="16" cy="19" rx="4" ry="5.5" fill="#082449"/>
+  <!-- Stripes -->
+  <rect x="12.2" y="17.5" width="7.6" height="2" rx="1" fill="#FFD45A"/>
+  <rect x="12.2" y="20.5" width="7.6" height="2" rx="1" fill="#FFD45A"/>
+</svg>

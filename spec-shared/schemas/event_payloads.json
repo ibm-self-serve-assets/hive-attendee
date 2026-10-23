@@ -1,0 +1,365 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive.example.com/schemas/events.json",
+  "definitions": {
+    "connection.test": {
+      "type": "object",
+      "required": ["operation_id", "probe"],
+      "properties": {
+        "operation_id": { "type": "string", "format": "uuid" },
+        "probe": { "type": "boolean", "const": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "topics": {
+    "gathering.started": {
+      "type": "object",
+      "required": ["job_id", "resource_id", "quantity"],
+      "properties": {
+        "job_id": { "type": "string", "format": "uuid" },
+        "resource_id": { "type": "string", "enum": ["resin", "silicon", "metals", "copper", "energy"] },
+        "quantity": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "gathering.completed": {
+      "type": "object",
+      "required": ["job_id", "resource_id", "quantity"],
+      "properties": {
+        "job_id": { "type": "string", "format": "uuid" },
+        "resource_id": { "type": "string", "enum": ["resin", "silicon", "metals", "copper", "energy"] },
+        "quantity": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "gathering.blocked": {
+      "type": "object",
+      "required": ["resource_id", "reason"],
+      "properties": {
+        "resource_id": { "type": "string", "enum": ["resin", "silicon", "metals", "copper", "energy"] },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "manufacturing.started": {
+      "type": "object",
+      "required": ["job_id", "station_id", "output_type", "inputs"],
+      "properties": {
+        "job_id": { "type": "string", "format": "uuid" },
+        "station_id": {
+          "type": "string",
+          "enum": [
+            "structural_molding",
+            "electronics_assembly",
+            "actuator_fabrication",
+            "battery_assembly"
+          ]
+        },
+        "output_type": {
+          "type": "string",
+          "enum": ["chassis", "electronics", "actuator", "battery"]
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "manufacturing.completed": {
+      "type": "object",
+      "required": ["job_id", "station_id", "part_id", "quantity"],
+      "properties": {
+        "job_id": { "type": "string", "format": "uuid" },
+        "station_id": {
+          "type": "string",
+          "enum": [
+            "structural_molding",
+            "electronics_assembly",
+            "actuator_fabrication",
+            "battery_assembly"
+          ]
+        },
+        "part_id": {
+          "type": "string",
+          "enum": ["chassis", "electronics", "actuator", "battery"]
+        },
+        "quantity": { "type": "integer", "const": 1 }
+      },
+      "additionalProperties": false
+    },
+    "manufacturing.blocked": {
+      "type": "object",
+      "required": ["station_id", "missing_inputs"],
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "enum": [
+            "structural_molding",
+            "electronics_assembly",
+            "actuator_fabrication",
+            "battery_assembly"
+          ]
+        },
+        "missing_inputs": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "manufacturing.resources.acquired": {
+      "type": "object",
+      "description": "Emitted every time resources are moved from simulation stock into a manufacturing station's staging cart. May fire multiple times per job as stock arrives incrementally. inputs_grabbed is the delta for this transfer only.",
+      "required": ["station_id", "inputs_grabbed"],
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "enum": [
+            "structural_molding",
+            "electronics_assembly",
+            "actuator_fabrication",
+            "battery_assembly"
+          ]
+        },
+        "inputs_grabbed": {
+          "type": "object",
+          "description": "Resources removed from simulation stock in this transfer (delta, not cumulative).",
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "assembly.started": {
+      "type": "object",
+      "required": ["job_id", "station_id", "output_type", "inputs"],
+      "properties": {
+        "job_id": { "type": "string", "format": "uuid" },
+        "station_id": {
+          "type": "string",
+          "enum": ["worker_assembly", "forager_assembly"]
+        },
+        "output_type": {
+          "type": "string",
+          "enum": ["engineer", "forager"]
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "assembly.completed": {
+      "type": "object",
+      "required": ["job_id", "station_id", "output_type", "quantity"],
+      "properties": {
+        "job_id": { "type": "string", "format": "uuid" },
+        "station_id": {
+          "type": "string",
+          "enum": ["worker_assembly", "forager_assembly"]
+        },
+        "output_type": {
+          "type": "string",
+          "enum": ["engineer", "forager"]
+        },
+        "quantity": { "type": "integer", "const": 1 }
+      },
+      "additionalProperties": false
+    },
+    "assembly.blocked": {
+      "type": "object",
+      "required": ["station_id", "missing_inputs"],
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "enum": ["worker_assembly", "forager_assembly"]
+        },
+        "missing_inputs": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "assembly.parts.acquired": {
+      "type": "object",
+      "description": "Emitted every time parts are moved from parts inventory into an assembly station's staging cart. May fire multiple times per robot job as parts become available incrementally. inputs_grabbed is the delta for this transfer only.",
+      "required": ["station_id", "inputs_grabbed"],
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "enum": ["worker_assembly", "forager_assembly"]
+        },
+        "inputs_grabbed": {
+          "type": "object",
+          "description": "Parts removed from parts inventory in this transfer (delta, not cumulative).",
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "simulation.state": {
+      "type": "object",
+      "required": [
+        "lifecycle_status",
+        "running",
+        "operational_error",
+        "resource_deliveries",
+        "resources",
+        "parts",
+        "stations",
+        "completed_robots",
+        "last_applied_command_id"
+      ],
+      "properties": {
+        "lifecycle_status": {
+          "type": "string",
+          "enum": ["paused", "running", "stopped", "expired"]
+        },
+        "running": { "type": "boolean" },
+        "operational_error": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["code", "message"],
+              "properties": {
+                "code": { "type": "string" },
+                "message": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "resource_deliveries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "interval_sim_ms",
+              "next_delivery_sim_time_ms",
+              "next_delivery_in_ms",
+              "quantity"
+            ],
+            "properties": {
+              "name": { "type": "string", "enum": ["resin", "silicon", "metals", "copper", "energy"] },
+              "interval_sim_ms": { "type": "integer", "minimum": 0 },
+              "next_delivery_sim_time_ms": { "type": "integer", "minimum": 0 },
+              "next_delivery_in_ms": { "type": "integer", "minimum": 0 },
+              "quantity": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "resources": {
+          "type": "object",
+          "required": ["resin", "silicon", "metals", "copper", "energy"],
+          "properties": {
+            "resin": { "type": "integer", "minimum": 0 },
+            "silicon": { "type": "integer", "minimum": 0 },
+            "metals": { "type": "integer", "minimum": 0 },
+            "copper": { "type": "integer", "minimum": 0 },
+            "energy": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "parts": {
+          "type": "object",
+          "required": ["chassis", "electronics", "actuator", "battery"],
+          "properties": {
+            "chassis": { "type": "integer", "minimum": 0 },
+            "electronics": { "type": "integer", "minimum": 0 },
+            "actuator": { "type": "integer", "minimum": 0 },
+            "battery": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "stations": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["station_id", "status", "missing_inputs", "job"],
+            "properties": {
+              "station_id": { "type": "string" },
+              "status": {
+                "type": "string",
+                "enum": ["idle", "working", "waiting_for_resources", "waiting_for_parts"]
+              },
+              "missing_inputs": {
+                "type": "object",
+                "additionalProperties": { "type": "integer", "minimum": 1 }
+              },
+              "job": {
+                "oneOf": [
+                  { "type": "null" },
+                  {
+                    "type": "object",
+                    "required": [
+                      "job_id",
+                      "output_type",
+                      "started_at_sim_ms",
+                      "completes_at_sim_ms",
+                      "consumed_inputs",
+                      "progress_percent"
+                    ],
+                    "properties": {
+                      "job_id": { "type": "string", "format": "uuid" },
+                      "output_type": { "type": "string" },
+                      "started_at_sim_ms": { "type": "integer", "minimum": 0 },
+                      "completes_at_sim_ms": { "type": "integer", "minimum": 0 },
+                      "consumed_inputs": { "type": "object" },
+                      "progress_percent": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "maximum": 100.0
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "completed_robots": {
+          "type": "object",
+          "required": ["count", "last_robot_id"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 0 },
+            "last_robot_id": {
+              "type": ["string", "null"],
+              "enum": ["engineer", "forager", null]
+            }
+          },
+          "additionalProperties": false
+        },
+        "last_applied_command_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "debug_mode_instructor_only": {
+          "description": "Ground-truth inventory snapshot injected when the server is in debug mode. Null when debug mode is off. DO NOT use this field in attendee views — it is absent in normal runs.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "properties": {
+                "resource": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+                "part":     { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+                "robot":    { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

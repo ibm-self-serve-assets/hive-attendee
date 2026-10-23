@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none" role="img" aria-labelledby="title">
+  <title id="title">Hive closed lock</title>
+  <path d="M82 116V92a46 46 0 0 1 92 0v24h-22V92a24 24 0 0 0-48 0v24Z" fill="#AAC4FF" stroke="#031040" stroke-width="7" stroke-linejoin="round"/>
+  <rect x="63" y="113" width="130" height="101" rx="22" fill="#6FA1FE" stroke="#031040" stroke-width="7"/>
+  <path d="M128 143a15 15 0 0 0-7.5 28v17a7.5 7.5 0 0 0 15 0v-17a15 15 0 0 0-7.5-28Z" fill="#031040"/>
+</svg>
