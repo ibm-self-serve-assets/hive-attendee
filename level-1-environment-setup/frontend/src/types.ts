@@ -20,6 +20,7 @@ export type EventSection = 'gathering' | 'manufacturing' | 'assembly';
 /** Shape of the state object sent from the backend SSE stream. */
 export interface DashboardState {
   stream_health: 'live' | 'stale' | 'awaiting_events';
+  attendee_id?: string | null;
   active_simulation_id: string | null;
   /** run_id of the most recent event (matches the run_id column in hive_job_durations). */
   run_id: string | null;
@@ -28,7 +29,7 @@ export interface DashboardState {
   lifecycle_status: 'paused' | 'running' | 'stopped' | 'expired';
   running: boolean;
 
-  // Completed counts keyed by resource_id / station_id / output_type
+  // Completed counts keyed by station_id / station_id / output_type
   gathering_completed: Record<string, number>;
   manufacturing_completed: Record<string, number>;
   assembly_completed: Record<string, number>;
@@ -38,8 +39,7 @@ export interface DashboardState {
   manufacturing_active: Record<string, boolean>;
   assembly_active: Record<string, boolean>;
 
-  // Blocked state: keyed by resource_id / station_id; value is missing_inputs (or reason for gathering)
-  gathering_blocked: Record<string, Record<string, unknown>>;
+  // Blocked state: keyed by station_id / station_id; value is missing_inputs (or reason for gathering)
   manufacturing_blocked: Record<string, Record<string, number>>;
   assembly_blocked: Record<string, Record<string, number>>;
 
@@ -48,7 +48,7 @@ export interface DashboardState {
   assembly_inputs: Record<string, Record<string, number>>;
 
   // Latest job durations from the hive_job_durations Flink topic:
-  // subject (resource_id or station_id) → elapsed_sim_minutes
+  // subject (station_id or station_id) → elapsed_sim_minutes
   job_durations: Record<string, number>;
 
   // Live inventory balances from the hive_inventory_balances Flink topic (Level 3).
@@ -76,6 +76,7 @@ export interface DashboardState {
 
 export const EMPTY_STATE: DashboardState = {
   stream_health: 'awaiting_events',
+  attendee_id: null,
   active_simulation_id: null,
   run_id: null,
   run_generation: 0,
@@ -88,7 +89,6 @@ export const EMPTY_STATE: DashboardState = {
   gathering_active: {},
   manufacturing_active: {},
   assembly_active: {},
-  gathering_blocked: {},
   manufacturing_blocked: {},
   assembly_blocked: {},
   manufacturing_inputs: {},

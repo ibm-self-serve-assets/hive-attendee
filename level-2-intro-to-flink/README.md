@@ -1,16 +1,16 @@
-# Stream Processing with Apache Flink (Confluent Cloud)
+# Stream Processing with Apache Flink in Confluent Cloud
 
 ## Overview & Goal
 
-In the Hive workshop, your simulation simulation emits discrete lifecycle events across different Kafka topics as resources are collected, components are manufactured, and worker robots are assembled. 
+In the Hive workshop, your simulation emits discrete lifecycle events across different Kafka topics as resources are collected, parts are manufactured, and robots are assembled. 
 
-However, raw events only tell you what happened at an instant in time:
+However, raw events tell you only what happened at an instant in time:
 - A `*.started` event announces that a job began.
 - A `*.completed` event announces that the job finished.
 
 **The Problem:** There is no single event that tells you how long a job actually took, whether it ran on schedule, or how station performance is trending across stages.
 
-**Your Objective:** As a stream processing engineer, you will use **Apache Flink on Confluent Cloud** to correlate unbounded event streams in real time. You will build an interval-join pipeline that pairs started and completed events by `job_id`, calculates accurate job durations, and outputs continuous, typed performance metrics to a unified `hive_job_durations` stream.
+**Your Objective:** As a stream processing engineer, you will use **Apache Flink on Confluent Cloud** to correlate unbounded event streams in real time. You will build an interval-join pipeline that pairs started and completed events by `job_id`, calculates job durations and outputs continuous, typed performance metrics to a unified `hive_job_durations` stream.
 
 ```
 ┌─────────────────────────┐
@@ -38,13 +38,13 @@ Your simulation publishes raw JSON events across three production stages (define
 Each event is wrapped in a standard envelope containing metadata (`occurred_at`, `sim_time_minutes`, `simulation_id`, `run_id`) and a `payload` containing `job_id` and the details of the job (resource, station or output).
 
 ### 2. Output Stream (`hive_job_durations`)
-Flink produces a unified, append-only stream and backing Kafka topic named `hive_job_durations`:
+Flink will create a Kafka topic named `hive_job_durations` and publish a unified, append-only stream with these fields:
 
 | Derived Metric / Field | Source / Calculation | Why It Matters |
 |---|---|---|
 | `job_id` | Shared `payload.job_id` | Correlates both events together |
 | `stage` | `gathering`, `manufacturing`, or `assembly` | Allows cross-stage filtering and grouping |
-| `subject` / `output_type` | `resource_id` or `station_id` | Identifies which station or item type was worked on |
+| `subject` / `output_type` | `station_id` or `station_id` | Identifies which station or item type was worked on |
 | `elapsed_sim_minutes` | `completed.sim_time_minutes - started.sim_time_minutes` | **Exact simulated duration.** Independent of clock drift or simulation speed. |
 | `elapsed_wall_s` | Difference between `occurred_at` timestamps | **Real-world duration in seconds.** Measures real wall-clock latency. |
 

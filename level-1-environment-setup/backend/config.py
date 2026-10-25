@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 class BackendConfig(BaseModel):
     simulation_server_url: str = "http://localhost:8080"
     workshop_access_token: Optional[str] = None
+    attendee_id: Optional[str] = None
     confluent_bootstrap_server: Optional[str] = None
     confluent_api_key: Optional[str] = None
     confluent_api_secret: Optional[str] = None
@@ -33,6 +34,7 @@ class BackendConfig(BaseModel):
 
         sim_url = env_dict.get("SIMULATION_SERVER_URL", "http://localhost:8080").rstrip("/")
         token = env_dict.get("WORKSHOP_ACCESS_TOKEN")
+        attendee = env_dict.get("ATTENDEE_ID")
         bootstrap = env_dict.get("CONFLUENT_BOOTSTRAP_SERVER")
         key = env_dict.get("CONFLUENT_API_KEY")
         secret = env_dict.get("CONFLUENT_API_SECRET")
@@ -44,6 +46,7 @@ class BackendConfig(BaseModel):
         return cls(
             simulation_server_url=sim_url,
             workshop_access_token=token if token != "CHANGE_ME" else None,
+            attendee_id=attendee if attendee != "CHANGE_ME" else None,
             confluent_bootstrap_server=bootstrap if bootstrap != "CHANGE_ME" else None,
             confluent_api_key=key if key != "CHANGE_ME" else None,
             confluent_api_secret=secret if secret != "CHANGE_ME" else None,

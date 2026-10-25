@@ -15,30 +15,21 @@
   "topics": {
     "gathering.started": {
       "type": "object",
-      "required": ["job_id", "resource_id", "quantity"],
+      "required": ["job_id", "station_id", "quantity"],
       "properties": {
         "job_id": { "type": "string", "format": "uuid" },
-        "resource_id": { "type": "string", "enum": ["resin", "silicon", "metals", "copper", "energy"] },
+        "station_id": { "type": "string", "enum": ["resin", "silicon", "metals", "copper", "energy"] },
         "quantity": { "type": "integer", "minimum": 1 }
       },
       "additionalProperties": false
     },
     "gathering.completed": {
       "type": "object",
-      "required": ["job_id", "resource_id", "quantity"],
+      "required": ["job_id", "station_id", "quantity"],
       "properties": {
         "job_id": { "type": "string", "format": "uuid" },
-        "resource_id": { "type": "string", "enum": ["resin", "silicon", "metals", "copper", "energy"] },
+        "station_id": { "type": "string", "enum": ["resin", "silicon", "metals", "copper", "energy"] },
         "quantity": { "type": "integer", "minimum": 1 }
-      },
-      "additionalProperties": false
-    },
-    "gathering.blocked": {
-      "type": "object",
-      "required": ["resource_id", "reason"],
-      "properties": {
-        "resource_id": { "type": "string", "enum": ["resin", "silicon", "metals", "copper", "energy"] },
-        "reason": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -111,8 +102,8 @@
     },
     "manufacturing.resources.acquired": {
       "type": "object",
-      "description": "Emitted every time resources are moved from simulation stock into a manufacturing station's staging cart. May fire multiple times per job as stock arrives incrementally. inputs_grabbed is the delta for this transfer only.",
-      "required": ["station_id", "inputs_grabbed"],
+      "description": "Emitted every time resources are moved from simulation stock into a manufacturing station's staging cart. May fire multiple times per job as stock arrives incrementally. inputs_acquired is the delta for this transfer only.",
+      "required": ["station_id", "inputs_acquired"],
       "properties": {
         "station_id": {
           "type": "string",
@@ -123,7 +114,7 @@
             "battery_assembly"
           ]
         },
-        "inputs_grabbed": {
+        "inputs_acquired": {
           "type": "object",
           "description": "Resources removed from simulation stock in this transfer (delta, not cumulative).",
           "additionalProperties": { "type": "integer", "minimum": 1 }
@@ -185,14 +176,14 @@
     },
     "assembly.parts.acquired": {
       "type": "object",
-      "description": "Emitted every time parts are moved from parts inventory into an assembly station's staging cart. May fire multiple times per robot job as parts become available incrementally. inputs_grabbed is the delta for this transfer only.",
-      "required": ["station_id", "inputs_grabbed"],
+      "description": "Emitted every time parts are moved from parts inventory into an assembly station's staging cart. May fire multiple times per robot job as parts become available incrementally. inputs_acquired is the delta for this transfer only.",
+      "required": ["station_id", "inputs_acquired"],
       "properties": {
         "station_id": {
           "type": "string",
           "enum": ["worker_assembly", "forager_assembly"]
         },
-        "inputs_grabbed": {
+        "inputs_acquired": {
           "type": "object",
           "description": "Parts removed from parts inventory in this transfer (delta, not cumulative).",
           "additionalProperties": { "type": "integer", "minimum": 1 }

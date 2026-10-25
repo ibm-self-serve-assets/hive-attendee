@@ -5,7 +5,6 @@ import { useLevel4 } from '../levels/level4/Level4Context';
 
 interface SidebarProps {
   state: DashboardState;
-  csrfToken: string;
   isCommandPending: boolean;
   onSendCommand: (command: string, extra?: Record<string, unknown>) => Promise<void>;
   levelId: string;
@@ -16,14 +15,13 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   state,
-  csrfToken: _csrfToken,
   isCommandPending,
   onSendCommand,
   levelId,
   onLevelChange,
   isReady = true,
 }) => {
-  const { stream_health, lifecycle_status, running, sim_time_minutes, active_simulation_id, run_id } = state;
+  const { stream_health, lifecycle_status, running, sim_time_minutes, active_simulation_id, run_id, attendee_id } = state;
   const isLive = stream_health === 'live';
   const isExpired = lifecycle_status === 'expired';
   const isStopped = lifecycle_status === 'stopped';
@@ -97,7 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 disabled={isCommandPending}
                 className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded text-sm font-bold bg-[#2850B8] hover:bg-[#3460C8] text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                <img src="/icons/svg/simulation_controls_run.svg" width={14} height={14} alt="Restart" />
+                <img src="/icons/svg/simulation_controls_start.svg" width={14} height={14} alt="Restart" />
                 <span>{isCommandPending ? 'Starting…' : 'Restart'}</span>
               </button>
             ) : isStopped ? (
@@ -106,7 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 disabled={isCommandPending}
                 className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded text-sm font-bold bg-[#2850B8] hover:bg-[#3460C8] text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                <img src="/icons/svg/simulation_controls_run.svg" width={14} height={14} alt="Restart" />
+                <img src="/icons/svg/simulation_controls_start.svg" width={14} height={14} alt="Restart" />
                 <span>{isCommandPending ? 'Starting…' : 'Restart'}</span>
               </button>
             ) : (
@@ -123,8 +121,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </>
                   ) : (
                     <>
-                      <img src="/icons/svg/simulation_controls_run.svg" width={14} height={14} alt="Run" />
-                      <span>Run</span>
+                      <img src="/icons/svg/simulation_controls_start.svg" width={14} height={14} alt="Run" />
+                      <span>Start</span>
                     </>
                   )}
                 </button>
@@ -225,10 +223,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="border-t border-[#2A4896] px-5 py-3 text-[10px] text-white">
         Closing this app does not pause the hosted simulation.
+        {(attendee_id || active_simulation_id) && (
+          <hr className="border-t border-white my-2" />
+        )}
+        {attendee_id && (
+          <>
+            <div className="font-bold">Attendee ID</div>
+            <div className="font-mono text-[11px] break-all">{attendee_id}</div>
+          </>
+        )}
         {active_simulation_id && (
           <>
-            <hr className="border-t border-white my-2" />
-            <div className="font-bold">Simulation ID</div>
+            <div className={`font-bold ${attendee_id ? 'mt-2' : ''}`}>Simulation ID</div>
             <div className="font-mono text-[11px] break-all">{active_simulation_id}</div>
           </>
         )}

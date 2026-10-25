@@ -2,24 +2,59 @@
 
 Working notes for Anthony and Bob. Not for attendees or instructors.
 
-Scope: everything in this repo (`hive`). That is the unified dashboard in `level-1-environment-setup/` (FastAPI backend, React/TypeScript/Vite frontend), the level folders, `spec-shared/`, and `Hive_Workshop_Overview.md`.
+Scope: everything in this repo (`hive-attendee`, remote `ibm-self-serve-assets/hive-attendee`). That is the unified dashboard in `level-1-environment-setup/` (FastAPI backend, React/TypeScript/Vite frontend), the level folders, `spec-shared/`, and `Hive_Workshop_Overview.md`.
 
-The simulation server lives in the `hive-simulation` repo. Its work is in [`next_steps_simulation.md`](next_steps_simulation.md). Decisions that affect both sides are listed in that file under "Shared decisions" and are not repeated here, only referenced.
+Layout: both repos sit side by side in one working directory, `hive-workshop/`:
 
-## Blocked on the simulation side
+```
+hive-workshop/
+  hive-attendee/     this repo: dashboard, level docs, Flink SQL   -> next_steps.md
+  hive-simulation/   the simulation server                         -> hive-simulation/next_steps.md
+```
 
-These need an answer from [`next_steps_simulation.md`](next_steps_simulation.md) first:
+The simulation server's plan is in [`../hive-simulation/next_steps.md`](../hive-simulation/next_steps.md). Decisions that affect both repos are listed there under "v2: shared decisions" and are not repeated here, only referenced.
 
-- The **order model** and the **event names** (`order.placed` / `order.fulfilled`). The Level 4 Orders panel and Treasury both depend on them.
-- How `spec-shared/` is **shared between the repos**. This repo and `hive-simulation` each hold a copy; the two are identical today. Any edit to `event_payloads.json` or `topics.py` has to land in both until this is decided.
+## Release plan
 
-## State of the repo
+| Release | What it is | Rule |
+|---|---|---|
+| **v1** | The current code in both repos, deployed as it stands. | **Frozen.** No feature work lands before v1 is deployed and tagged. Only fixes needed to ship (section "Before v1 ships"). |
+| **v2** | Everything else in this file: the Orders/Treasury rework, order events, Tableflow, later levels. | Starts after v1 is deployed. Work on a separate branch, so v1 can still take a hotfix. |
 
-- Working tree is clean on `main`. The old notes marked the Level 4 screen as "uncommitted"; it is committed (`levels/level4/` exists).
-- Levels 1 to 3 are done. Level 4 is partly built (see below). `level-4-gamify/` and `level-5-tableflow/` are empty folders.
-- `backup_ui/` no longer exists on disk. The old notes still list it, so references to it can go.
+Suggested tagging (you run git): tag `v1.0.0` in both repos at the commit that is deployed, then branch `v2` from it. Record which simulation server image the v1 dashboard was tested against, since the two are deployed separately.
 
-## 1. Level 4 screen: Orders and Treasury
+## v1: state
+
+- Working tree is clean on `main` (one commit, "Initial commit").
+- Levels 1 to 3 are done. `levels/registry.ts` registers four levels, so **Level 4 ships in v1 in its current form**: per-station add/upgrade controls and the treasury sidebar. It is driven from `state.inventory.robot` (coins earned = robot counts times `ROBOT_PRICES`), and purchases are held client-side in `Level4Context.tsx`. The server has no orders in v1, so nothing replaces that yet. The rework is v2 section 1.
+- `level-4-gamify/` and `level-5-tableflow/` are empty folders. They do not affect v1.
+- `backup_ui/` no longer exists on disk, so references to it can go.
+
+## Before v1 ships
+
+Verification and configuration only. No new features.
+
+- [ ] **Decide whether Level 4 ships.** It is registered and unlocked by `hive_inventory_balances_ready`, but it is partly built and has no README (`level-4-gamify/` is empty). Either ship it as is and tell attendees it is a preview, or hide it for v1 by removing its entry from `LEVELS` in `levels/registry.ts`. That is a one-line change and a v1 call. Default if undecided: ship it unchanged.
+- [ ] **Point the dashboard backend at the deployed simulation server** (URL and auth) and update the Level 1 setup steps in `level-1-environment-setup/README.md`.
+- [ ] **Check the dashboard backend's long-lived connections** against the Cloud Run request timeout. A run lasts 2.8 to 5.6 real hours.
+- [ ] **Rehearse with 3 to 5 real attendee clusters** before the class. The v2 load test uses a mock Kafka and does not cover real Confluent behaviour.
+- [ ] Confirm `debug_mode_instructor_only` is `null` in any workshop run. `store.py` reads it to bypass Flink inventory; keep that path out of attendee docs, since the field is instructor-only.
+- [ ] Confirm the `*.acquired` events (`manufacturing.resources.acquired`, `assembly.parts.acquired`) are provisioned and deleted. `provision_topics.py` builds its topic list from `spec-shared/schemas/event_payloads.json`, so they should be covered with no script change. Verify with `python3 provision_topics.py --dry-run` and a look at `delete_topics.py`. `store.py` already accepts them with no state change.
+- [ ] Document the `*.acquired` events in the Level 1 docs (`README.md`, topic list) if they are missing.
+- [ ] Fix the leftover rename artifact "simulation simulation" in `Hive_Workshop_Overview.md` (it appears in several sentences, for example "manages the simulation simulation itself"; likely a global rename of "factory" to "simulation"). This is a text fix, safe for v1.
+- [ ] Repo hygiene: untrack `.DS_Store` if tracked. `.gitignore` already lists it.
+- [ ] Commit, push, tag `v1.0.0`, branch `v2`.
+
+## v2: blocked on the simulation side
+
+These need an answer from [`../hive-simulation/next_steps.md`](../hive-simulation/next_steps.md) first:
+
+- The **order model**, the **event names** (`order.placed` / `order.fulfilled`) and the **contract version**. The Level 4 Orders panel and Treasury both depend on them.
+- How `spec-shared/` is **shared between the repos**. This repo and `hive-simulation` each hold a copy; the two are identical today apart from a stray `.DS_Store` in the simulation copy. Any edit to `event_payloads.json` or `topics.py` has to land in both until this is decided.
+
+## v2 work
+
+### 1. Level 4 screen: Orders and Treasury
 
 On `levels/level4/Level4Screen.tsx`, replace the **Robot inventory** panel above **Robot assembly** with **Orders** and **Treasury**.
 
@@ -31,14 +66,12 @@ On `levels/level4/Level4Screen.tsx`, replace the **Robot inventory** panel above
 - [ ] Decide whether purchases should stay client-only. They are tracked in `Level4Context.tsx`, so a page refresh loses them and the server does not know about them. Keep this deliberate, or persist them (for example in `localStorage`).
 - [ ] Keep gating Level 4 on `hive_inventory_balances` like Level 3, or add a gate for the order topic once it exists.
 
-## 2. Topics and events in the attendee repo
+### 2. Topics and events
 
-- [ ] Confirm the `*.acquired` events (`manufacturing.resources.acquired`, `assembly.parts.acquired`) are provisioned and deleted. `provision_topics.py` builds its topic list from `spec-shared/schemas/event_payloads.json`, so they should be covered with no script change. Verify with `python3 provision_topics.py --dry-run` and a look at `delete_topics.py`. `store.py` already accepts them with no state change.
-- [ ] Order topics: the same check applies once the events are added to `event_payloads.json`.
-- [ ] Document the new events in the Level 1 docs (`README.md`, topic list).
-- [ ] Confirm `debug_mode_instructor_only` is `null` in any workshop run. `store.py` reads it to bypass Flink inventory; keep that path out of attendee docs, since the field is instructor-only.
+- [ ] Order topics: provisioning and deletion pick them up from `event_payloads.json` once the events are added. Re-run `provision_topics.py --dry-run` and check `delete_topics.py`.
+- [ ] Document the order events in the Level 1 docs (`README.md`, topic list).
 
-## 3. Level numbering (needs a decision)
+### 3. Level numbering (needs a decision)
 
 The docs and the dashboard disagree:
 
@@ -48,29 +81,22 @@ The docs and the dashboard disagree:
 - [ ] Pick one numbering and update together: the overview, the folder names, the label in `levels/registry.ts`, and the Tableflow roadmap item.
 - [ ] Fill in or remove the two empty folders once the numbering is set.
 
-## 4. Level documentation
+### 4. Level documentation
 
 - [ ] Write the Level 4 (gamify) README for attendees. It must not reveal the simulation's hidden counters or internals.
-- [ ] Update `level-1-environment-setup/README.md` for the new topics and any change to how the dashboard finds the simulation server.
-- [ ] Fix the leftover rename artifact "simulation simulation" in `Hive_Workshop_Overview.md` (it appears in several sentences, for example "manages the simulation simulation itself"; likely a global rename of "factory" to "simulation").
-- [ ] Remove stale references to `simulation-instructor-only/` and `backup_ui/` from docs once the repo move is settled. The only place the old path still appears in this repo is `next_steps.md`.
+- [ ] Update `level-1-environment-setup/README.md` for the order topics and any change to how the dashboard finds the simulation server.
+- [ ] Remove stale references to `simulation-instructor-only/` and `backup_ui/` from docs once the layout is settled.
 
-## 5. Tableflow runbook (Level 4 or 5, see numbering)
+### 5. Tableflow runbook (Level 4 or 5, see numbering)
 
 - [ ] Write the Iceberg sync and data-lakehouse instructions for both `hive_job_durations` (append) and `hive_inventory_balances` (upsert). Keep the two topics separate; they have different changelog modes, consumers and dashboard levels.
 
-## 6. Later levels (from the overview)
+### 6. Later levels (from the overview)
 
 - [ ] Headless agentic harness with IBM Bob (planned Level 5).
 - [ ] Bob managing the simulation (planned Level 6). This needs the simulation's REST controls documented for an agent, which is a simulation-repo task.
 
-## 7. Connecting to the deployed simulation
-
-- [ ] Once the server is on Cloud Run, check how the dashboard backend is pointed at it (URL and auth) and update the Level 1 setup steps.
-- [ ] Check the dashboard backend's long-lived connections against the Cloud Run request timeout. A run lasts 2.8 to 5.6 real hours.
-- [ ] Rehearse with 3 to 5 real attendee clusters before the class. The load test in the simulation repo uses a mock Kafka and does not cover real Confluent behaviour.
-
-## 8. Cleanup
+### 7. Cleanup
 
 - [ ] Delete `SegmentRingLegacy` in `level-1-environment-setup/frontend/src/components/StationStats.tsx` once the new `DotSpinner` is confirmed.
 
@@ -92,12 +118,14 @@ To add a level:
 
 ## Working agreements for this repo
 
+- v1 is frozen once tagged. Fixes to a deployed v1 go on a hotfix branch, not on `v2`.
 - **Keep the levels current.** When the simulation, the attendee backend/frontend, or the Flink SQL changes, update the matching level `.md` files in the same change.
 - **Audience.** Levels 1 to 4 are written for attendees and do not reveal hidden simulation state.
 - **Hidden state stays out.** Do not add fields such as `staged_inputs` to the schema, the models, or the dashboard, and do not recompute carts in the dashboard backend.
 - **One source of truth.** Point to `simulation_rules.json` and `event_payloads.json` instead of copying values into docs.
 - **Attendee SQL** runs in the Confluent Flink workspace, one statement per run. Prefer a small number of files that each run once.
 - **Two Flink output topics:** `hive_job_durations` (append) and `hive_inventory_balances` (upsert). Do not merge them.
+- Until `spec-shared/` is resolved, change it in both repos in the same step and diff the two copies.
 
 ## Done (for reference)
 
@@ -106,4 +134,4 @@ To add a level:
 - Level 3: ledger and balances; gate on `hive_inventory_balances`; Flink SQL (`01_create_sink.sql`, `02_run_jobs.sql`, `03_validate.sql`) and CLI-first README.
 - Event panels start collapsed in Levels 1 and 2.
 - Schema Registry 5-byte magic prefix stripped in both Flink topic consumers.
-- Level 4 screen started: per-station add/upgrade controls and treasury sidebar (to be reworked in section 1).
+- Level 4 screen started: per-station add/upgrade controls and treasury sidebar (ships in v1 as is; reworked in v2 section 1).

@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import secrets
 import uuid
 from contextlib import asynccontextmanager
 from typing import Optional, List, Any, Dict
@@ -13,6 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.config import BackendConfig
+from backend.log_setup import LOG_FILE, MAJOR
 from backend.store import DashboardStore
 from backend.consumer import EventConsumerManager, CalculatedValuesConsumer, InventoryBalancesConsumer
 from backend.topic_watch import CalculatedValuesWatcher, InventoryBalancesWatcher, EventTopicsWatcher
@@ -27,7 +27,6 @@ hive_job_durations_watcher: Optional[CalculatedValuesWatcher] = None
 hive_job_durations_consumer: Optional[CalculatedValuesConsumer] = None
 hive_inventory_balances_watcher: Optional[InventoryBalancesWatcher] = None
 hive_inventory_balances_consumer: Optional[InventoryBalancesConsumer] = None
-csrf_token: str = secrets.token_hex(16)
 subscribers: List[asyncio.Queue] = []
 
 
@@ -42,10 +41,14 @@ async def notify_subscribers(snap: Dict[str, Any]):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global consumer_mgr, csrf_token, event_topics_watcher, \
+    global consumer_mgr, event_topics_watcher, \
         hive_job_durations_watcher, hive_job_durations_consumer, \
         hive_inventory_balances_watcher, hive_inventory_balances_consumer
-    csrf_token = secrets.token_hex(16)
+    store.attendee_id = config.attendee_id
+    logger.info(
+        f"Console shows only major events and errors. Full logs: {LOG_FILE}",
+        extra=MAJOR,
+    )
 
     consumer_mgr = EventConsumerManager(
         store=store,
@@ -120,6 +123,7 @@ async def lifespan(app: FastAPI):
 
 async def auto_connect():
     global consumer_mgr
+    store.attendee_id = config.attendee_id
     if not config.workshop_access_token:
         logger.warning("AUTO-CONNECT: WORKSHOP_ACCESS_TOKEN missing — skipping")
         return
@@ -128,6 +132,8 @@ async def auto_connect():
         return
 
     headers = {"Authorization": f"Bearer {config.workshop_access_token}"}
+    if config.attendee_id:
+        headers["X-Attendee-Id"] = config.attendee_id
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -145,7 +151,7 @@ async def auto_connect():
                 if facts:
                     f0 = facts[0]
                     if f0.get("lifecycle_status") == "expired":
-                        logger.info(f"AUTO-CONNECT: Simulation {f0['simulation_id'][:8]} is expired; will provision fresh simulation")
+                        logger.info(f"AUTO-CONNECT: Simulation {f0['simulation_id'][:8]} is expired; will provision fresh simulation", extra=MAJOR)
                         store.active_simulation_id = None
                     else:
                         store.active_simulation_id = f0["simulation_id"]
@@ -153,19 +159,22 @@ async def auto_connect():
                         store.lifecycle_status = f0.get("lifecycle_status", store.lifecycle_status)
                         store.running = f0.get("running", store.running)
                         topics_map = f0.get("topics", {})
-                        logger.info(f"AUTO-CONNECT: Reconnected to simulation {f0['simulation_id'][:8]}…")
+                        logger.info(f"AUTO-CONNECT: Reconnected to simulation {f0['simulation_id'][:8]}…", extra=MAJOR)
 
             if not store.active_simulation_id:
-                logger.info("AUTO-CONNECT: Provisioning new simulation…")
+                logger.info("AUTO-CONNECT: Provisioning new simulation…", extra=MAJOR)
+                prov_body: Dict[str, Any] = {
+                    "bootstrap_server": config.confluent_bootstrap_server,
+                    "producer_credentials": {
+                        "api_key": config.confluent_api_key,
+                        "api_secret": config.confluent_api_secret,
+                    },
+                }
+                if config.attendee_id:
+                    prov_body["attendee_id"] = config.attendee_id
                 prov_r = await client.post(
                     f"{config.simulation_server_url}/v1/simulations",
-                    json={
-                        "bootstrap_server": config.confluent_bootstrap_server,
-                        "producer_credentials": {
-                            "api_key": config.confluent_api_key,
-                            "api_secret": config.confluent_api_secret,
-                        },
-                    },
+                    json=prov_body,
                     headers={
                         **headers,
                         "Idempotency-Key": str(uuid.uuid4()),
@@ -176,7 +185,7 @@ async def auto_connect():
                 prov_data = prov_r.json()
                 store.active_simulation_id = prov_data["simulation_id"]
                 store.reset()
-                logger.info(f"AUTO-CONNECT: Simulation provisioned {store.active_simulation_id[:8]}… waiting for probe verification")
+                logger.info(f"AUTO-CONNECT: Simulation provisioned {store.active_simulation_id[:8]}… waiting for probe verification", extra=MAJOR)
 
                 # Poll until verification probes pass and lifecycle leaves 'provisioning'
                 for _ in range(30):  # poll up to 6 seconds (30 * 200ms)
@@ -192,12 +201,13 @@ async def auto_connect():
                             topics_map = fdata.get("topics", {})
                             store.lifecycle_status = status
                             store.running = (status == "running")
-                            logger.info(f"AUTO-CONNECT: Simulation ready with status '{status}'")
+                            logger.info(f"AUTO-CONNECT: Simulation ready with status '{status}'", extra=MAJOR)
                             break
 
             if topics_map:
                 topic_list = list(topics_map.values())
-                consumer_mgr.stop()
+                if consumer_mgr:
+                    consumer_mgr.stop()
                 consumer_mgr = EventConsumerManager(
                     store=store,
                     bootstrap_servers=config.confluent_bootstrap_server,
@@ -207,11 +217,25 @@ async def auto_connect():
                     on_event_callback=notify_subscribers,
                 )
                 consumer_mgr.start()
-                logger.info(f"AUTO-CONNECT: Consumer started on {len(topic_list)} topics")
+                logger.info(f"AUTO-CONNECT: Consumer started on {len(topic_list)} topics", extra=MAJOR)
                 await notify_subscribers(store.snapshot())
             else:
                 logger.warning("AUTO-CONNECT: No topics — consumer not started")
 
+    except httpx.HTTPStatusError as e:
+        detail_msg = ""
+        try:
+            err_json = e.response.json()
+            if isinstance(err_json, dict) and "detail" in err_json:
+                d = err_json["detail"]
+                detail_msg = d.get("message") if isinstance(d, dict) else str(d)
+            elif isinstance(err_json, dict) and "message" in err_json:
+                detail_msg = err_json["message"]
+            else:
+                detail_msg = str(err_json)
+        except Exception:
+            detail_msg = e.response.text or str(e)
+        logger.error(f"AUTO-CONNECT: HTTP {e.response.status_code} from sim server: {detail_msg}")
     except Exception as e:
         logger.error(f"AUTO-CONNECT: {e}")
 
@@ -231,23 +255,10 @@ app.add_middleware(
 )
 
 
-def verify_csrf(x_csrf_token: Optional[str] = Header(None)):
-    if not x_csrf_token or x_csrf_token != csrf_token:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"error_code": "invalid_csrf_token", "message": "CSRF token mismatch"},
-        )
-
-
 class ControlCommandRequest(BaseModel):
     command: str
     start: Optional[bool] = True
     expected_generation: Optional[int] = None
-
-
-@app.get("/api/csrf")
-async def get_csrf():
-    return {"csrf_token": csrf_token}
 
 
 @app.get("/api/config")
@@ -267,8 +278,7 @@ async def get_status():
 
 
 @app.post("/api/connect")
-async def retry_connect(x_csrf_token: Optional[str] = Header(None)):
-    verify_csrf(x_csrf_token)
+async def retry_connect():
     asyncio.create_task(auto_connect())
     return {"status": "connecting"}
 
@@ -276,9 +286,7 @@ async def retry_connect(x_csrf_token: Optional[str] = Header(None)):
 @app.post("/api/controls")
 async def send_control(
     req: ControlCommandRequest,
-    x_csrf_token: Optional[str] = Header(None),
 ):
-    verify_csrf(x_csrf_token)
     if not config.workshop_access_token:
         raise HTTPException(status_code=400, detail={"error_code": "not_connected", "message": "No access token configured"})
 
@@ -287,7 +295,7 @@ async def send_control(
 
     if not store.active_simulation_id:
         if req.command == "restart":
-            logger.info("Restart requested with no active simulation; provisioning fresh simulation...")
+            logger.info("Restart requested with no active simulation; provisioning fresh simulation...", extra=MAJOR)
             await auto_connect()
             if not store.active_simulation_id:
                 raise HTTPException(status_code=500, detail={"error_code": "provision_failed", "message": "Failed to provision new simulation"})
@@ -302,6 +310,8 @@ async def send_control(
         "Idempotency-Key": str(uuid.uuid4()),
         "X-Server-Epoch": store.server_epoch or "",
     }
+    if config.attendee_id:
+        headers["X-Attendee-Id"] = config.attendee_id
     body: Dict[str, Any] = {}
     if req.expected_generation is not None:
         body["expected_generation"] = req.expected_generation
@@ -313,7 +323,7 @@ async def send_control(
     async with httpx.AsyncClient(timeout=8.0) as client:
         r = await client.post(cmd_url, json=body, headers=headers)
         if (r.status_code in (404, 409)) or (r.status_code == 410 and req.command == "restart"):
-            logger.info(f"Server returned {r.status_code}; refreshing connection and active simulation...")
+            logger.info(f"Server returned {r.status_code}; refreshing connection and active simulation...", extra=MAJOR)
             store.active_simulation_id = None
             await auto_connect()
             if not store.active_simulation_id:
@@ -343,6 +353,8 @@ async def _send_server_command(command: str, body: Optional[Dict[str, Any]] = No
         "Idempotency-Key": str(uuid.uuid4()),
         "X-Server-Epoch": store.server_epoch or "",
     }
+    if config.attendee_id:
+        headers["X-Attendee-Id"] = config.attendee_id
     async with httpx.AsyncClient(timeout=8.0) as client:
         r = await client.post(cmd_url, json=body or {}, headers=headers)
         if r.status_code >= 400:

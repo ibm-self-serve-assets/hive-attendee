@@ -45,6 +45,26 @@
       "handlers": ["access"],
       "level": "INFO",
       "propagate": false
+    },
+    "hive": {
+      "handlers": ["default"],
+      "level": "INFO",
+      "propagate": false
+    },
+    "hive.backend": {
+      "handlers": ["default"],
+      "level": "INFO",
+      "propagate": false
+    },
+    "hive.consumer": {
+      "handlers": ["default"],
+      "level": "INFO",
+      "propagate": false
+    },
+    "hive.topic_watch": {
+      "handlers": ["default"],
+      "level": "INFO",
+      "propagate": false
     }
   }
 }

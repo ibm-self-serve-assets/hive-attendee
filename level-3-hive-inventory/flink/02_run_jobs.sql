@@ -39,7 +39,7 @@ BEGIN
 
 -- ============================================================================
 -- JOB 1: Resource inventory
---   Inflows  : gathering-completed  (payload.resource_id, payload.quantity)
+--   Inflows  : gathering-completed  (payload.station_id, payload.quantity)
 --   Outflows : manufacturing-started (payload.inputs.{energy,resin,metals,copper,silicon})
 -- ============================================================================
 INSERT INTO `hive_inventory_balances`
@@ -55,10 +55,10 @@ FROM (
   SELECT
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.simulation_id')                              AS simulation_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.run_id')                                  AS run_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.resource_id')                     AS item_id,
+    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                     AS item_id,
     CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.quantity') AS BIGINT)        AS delta
   FROM `gathering-completed`
-  WHERE JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.resource_id') IS NOT NULL
+  WHERE JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id') IS NOT NULL
 
   UNION ALL
 

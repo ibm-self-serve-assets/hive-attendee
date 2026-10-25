@@ -21,7 +21,7 @@ export const Level1Requirements: React.FC<LevelScreenProps> = ({ state }) => {
         </ul>
       )}
       <p className="mt-3 max-w-sm text-sm text-[#57606A] leading-snug">
-        Complete Step 4 in Level 1 to create these topics.
+        Complete Level 1 to create these topics.
       </p>
     </div>
   );

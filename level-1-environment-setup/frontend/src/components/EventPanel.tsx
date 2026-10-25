@@ -33,11 +33,11 @@ export function describeEvent(ev: HiveEvent): string {
   const station = typeof p.station_id === 'string' ? titleCase(p.station_id) : '';
   switch (ev.event_type) {
     case 'gathering.started':
-      return `${titleCase(String(p.resource_id ?? ''))} +${asNum(p.quantity)} started`;
+      return `${titleCase(String(p.station_id ?? ''))}`;
     case 'gathering.completed':
-      return titleCase(String(p.resource_id ?? ''));
-    case 'gathering.blocked':
-      return `${titleCase(String(p.resource_id ?? ''))}: ${String(p.reason ?? 'blocked')}`;
+      return `+${asNum(p.quantity)} ${titleCase(String(p.station_id ?? ''))}`;
+    case 'manufacturing.resources.acquired':
+      return `${station} →  (${fmtCounts(p.inputs_acquired)})`;
     case 'manufacturing.started':
       return `${station} → ${titleCase(String(p.output_type ?? ''))} (uses ${fmtCounts(p.inputs)})`;
     case 'manufacturing.completed':
@@ -172,7 +172,7 @@ interface EventPanelProps {
 }
 
 export const EventPanel: React.FC<EventPanelProps> = ({ title, events }) => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [selected, setSelected] = useState<HiveEvent | null>(null);
 
   return (

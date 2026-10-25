@@ -41,7 +41,7 @@
 --
 -- Event fields used (see spec-shared/schemas/event_payloads.json):
 --   envelope : simulation_id, run_id, occurred_at, sim_time_minutes
---   payload  : job_id, resource_id / station_id / output_type
+--   payload  : job_id, station_id / station_id / output_type
 -- =============================================================================
 
 EXECUTE STATEMENT SET
@@ -64,8 +64,8 @@ FROM (
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.job_id')                              AS job_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.simulation_id')                                  AS simulation_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.run_id')                                      AS run_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.resource_id')                         AS subject,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.resource_id')                         AS output_type,
+    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                         AS subject,
+    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                         AS output_type,
     CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.sim_time_minutes') AS BIGINT)           AS sim_time_minutes,
     CAST(REPLACE(REPLACE(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.occurred_at'), 'T', ' '), '+00:00', '') AS TIMESTAMP(3)) AS occurred_at,
     `$rowtime`                                                                         AS row_time

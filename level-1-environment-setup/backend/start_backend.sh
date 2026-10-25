@@ -34,6 +34,7 @@ echo "Installing requirements ..."
 "$PIP" install --quiet -r "$REQUIREMENTS"
 
 echo "Starting Hive Dashboard Backend on http://localhost:8001 ..."
+echo "Console shows only major events and errors. Full logs: $SCRIPT_DIR/../logs/hive-backend.log"
 echo ""
 cd "$SCRIPT_DIR/.."
 PYTHONPATH="$SCRIPT_DIR/..:$SCRIPT_DIR" "$UVICORN" backend.app:app \

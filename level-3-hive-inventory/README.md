@@ -202,7 +202,7 @@ If you see rows with changing quantities, Level 3 is working. Open **Level 3** i
 ### Resources
 ```
 resources[item_id] =
-    SUM(gathering-completed.payload.quantity   WHERE resource_id = item_id)
+    SUM(gathering-completed.payload.quantity   WHERE station_id = item_id)
   − SUM(manufacturing-started.payload.inputs[item_id])
 ```
 Resources are delivered by gathering jobs and consumed when manufacturing stations start (inputs are staged at job start, not at job completion).

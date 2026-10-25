@@ -13,7 +13,6 @@ function levelIdFromHash(): string {
 
 export const App: React.FC = () => {
   const [state, setState] = useState<DashboardState>(EMPTY_STATE);
-  const [csrfToken, setCsrfToken] = useState('');
   const [connectError, setConnectError] = useState<string | null>(null);
   const [levelId, setLevelId] = useState(levelIdFromHash);
   const level = LEVELS.find((l) => l.id === levelId) ?? LEVELS[0];
@@ -35,15 +34,10 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  // Fetch CSRF token and check config on mount
+  // Check config on mount
   useEffect(() => {
     const init = async () => {
       try {
-        const csrfRes = await fetch('/api/csrf');
-        if (csrfRes.ok) {
-          const { csrf_token } = await csrfRes.json();
-          setCsrfToken(csrf_token);
-        }
         const cfgRes = await fetch('/api/config');
         if (cfgRes.ok) {
           const cfg = await cfgRes.json();
@@ -89,7 +83,6 @@ export const App: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfToken,
         },
         body: JSON.stringify({
           command,
@@ -149,7 +142,6 @@ export const App: React.FC = () => {
         <div className="flex-1 min-h-0 flex overflow-hidden">
           <Sidebar
             state={state}
-            csrfToken={csrfToken}
             isCommandPending={isCommandPending}
             onSendCommand={handleSendCommand}
             levelId={levelId}

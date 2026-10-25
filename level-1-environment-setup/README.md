@@ -15,7 +15,7 @@ This workshop's documentation highlights why event-driven architectures is power
 - Visit the Confluent Developer site to watch a series of short videos about [Designing Event-Driven Microservices](https://developer.confluent.io/courses/microservices/overview/).
 
 
-<img src="assets/oreilly_event_driven_service.png" width="25%" />
+<img src="screenshots/oreilly_event_driven_service.png" width="40%" />
 
 ---
 
@@ -71,7 +71,7 @@ The simulation starts in **Gather resources** where independent stations gather 
 4. Resin
 5. Silicon
 
-<img src="assets/hive_simulation_dashboard.png" width="50%" />
+<img src="screenshots/hive_simulation_dashboard.png" />
 
 Each station in the **Manufacture parts** section provides the various parts required to assemble a robot:
 
@@ -112,7 +112,7 @@ Skip this step if you already have a `hive_dev` environment with a Kafka cluster
 4. Under **Stream Governance package**, leave **Essentials** selected (starts at Free). This turns on **Schema Registry**, which Level 2 and Level 3 need.
 5. Click **Create**.
 
-   <img src="assets/confluent_create_environment.png" alt="Confluent Cloud: Create environment dialog with Essentials selected" width="60%" />
+   <img src="screenshots/confluent_create_environment.png" alt="Confluent Cloud: Create environment dialog with Essentials selected"/>
 
 6. Create a Kafka cluster in the `hive_dev` environment: **Basic** or **Standard**, on **Google Cloud** in a US region (for example `us-west1`). Note the region, because the Flink compute pool you create in Level 2 must use the same one.
 
@@ -154,19 +154,19 @@ The backend and topic provisioning scripts read configuration from `spec-shared/
 
 4. Go to your [Confluent Cloud home page](https://confluent.cloud/), open the right-side navigation panel then select **Accounts and access**.
  
-<img src="assets/right_side_user_account.png" width="25%" />
+<img src="screenshots/right_side_user_account.png" width="50%" />
 
 5. Click on your account name .
 
-<img src="assets/select_user_account.png" width="75%" />
+<img src="screenshots/select_user_account.png" />
 
 6. Select **API keys** tab then click the **Add API key**.
 
-<img src="assets/user_account.png" width="75%" />
+<img src="screenshots/user_account.png"/>
 
 7. Enter **Name** as `hive_workshop`, skip **Description**, open the **Select key scope** dropdown and choose `Kafka cluster`, choose **Environments** as `hive_dev` and **Cluster** as `hive_cluster_1`
 
-<img src="assets/api_key.png" width="50%" />
+<img src="screenshots/api_key.png" />
 
 8. Click **Create API key** and copy the key and into [spec-shared/.env](../spec-shared/.env) because Confluent only shows it once.
 
@@ -177,7 +177,7 @@ CONFLUENT_API_SECRET=your-api-secret
 
 8. Return to your [Confluent Cloud home page](https://confluent.cloud/) and select your cluster.  There are various ways to get there, but you'll end up here.  Identify your **Rest endpoint**, **Bootstrap server** and **ID** of your cluster.  Enter them into [spec-shared/.env](../spec-shared/.env).
 
-<img src="assets/cluster_home_page.png" />
+<img src="screenshots/cluster_home_page.png" />
 
 ```ini
 CONFLUENT_BOOTSTRAP_SERVER=pkc-xxxxx.us-west-2.aws.confluent.cloud:9092
@@ -288,37 +288,57 @@ Open your browser at **`http://localhost:5174`** (or the port displayed in your 
 
 When the dashboard loads, you will see the **Hive Robotics** interface.  The connection status indicator and **level selector dropdown** will be visible in the top-right.  As you advance through the workshop, you will use a Level selctor to activate each level. Automated validation tests will verify that your stream processing jobs and data pipelines are properly configured and running.  Once those tests pass, you will gain access to the level.
 
-The sidebar shows **Connected** and your Simulation ID, and the simulation controls, including **Run**, are visible. Every counter reads zero because your simulation is paused. Continue to [Step 8](#step-8-run-your-simulation) to run your simulation and watch its events arrive.
-
-<img src="assets/level_1_dashboard.png" width="65%" />
-
 If you see a **Level 1 is locked** warning like the one below instead, one or more of your topics are missing from your Confluent Cloud cluster. Re-run [Step 4](#step-4-provision-your-kafka-topics) and the warning clears once every topic exists. If **Run** still doesn't work afterwards, ask your instructor to reset your simulation.
 
-<img src="assets/level_1_error.png" width="65%" />
+<img src="screenshots/level_1_error.png"/>
+
+The sidebar shows **Connected** and your Simulation ID, and the simulation controls, including **Run**, are visible. Every counter reads zero because your simulation is paused. Continue to [Step 8](#step-8-run-your-simulation) to run your simulation and watch its events arrive.
+
+<img src="screenshots/level_1_dashboard.png" />
 
 ---
 
 ## Step 8: Run Your Simulation
 
-Using the controls in the sidebar of your Dashboard, you can start, pause, stop and restart your simulation. Your events flow from the hosted Hive Simulation server, through Confluent Cloud, to the Hive Dashboard running on your laptop:
+You can start, pause, stop and restart your simulation using controls at left in your Dashboard. Your events flow from the hosted Hive Simulation server, through Confluent Cloud to the Hive Dashboard running on your laptop:
 
 1. **Dashboard Backend**: Connects to Confluent Cloud via `confluent-kafka` and streams raw events (`*.started`, `*.completed`, `simulation.state`) to the frontend over Server-Sent Events (SSE).
-2. **Dashboard Frontend**: Displays the real-time simulation floor, active/completed counters, sim clock (`Day X, HH:MM`), and simulation lifecycle controls (Run, Pause, Stop, Restart).
+2. **Dashboard Frontend**: Displays the real-time simulation floor, active/completed counters, sim clock (`Day X, HH:MM`), and simulation lifecycle controls (Start, Pause, Stop, Restart).
 
 With **Level 1** selected in the Levels dropdown, click **Run** in the simulation controls.  
 
 If you select the other levels, you will see warnings that they are not yet available to you.
 
+## Step 9: Understanding Your Level 1 Dashboard
+
+When running, the values under **Gathering resources** increment after each `gathering.completed` events is received.  Open the **Resource Events** window to see all events as they are received.
+
+The problem is that we know how many resources have been gathered but not how long it takes to gather each.  In Level 2, you will use Flink to calculate these stats as they will be useful for optimizing our system and determining how to allocate revenue generated from building robots.
+
+<img src="screenshots/gathering_resources.png" />
+<img src="screenshots/resource_events.png" />
+
+While resource values are incrementing, the **Manufacturing Parts** section remains at zero.  Run the simulation for ~30 seconds until the you see one of the Manufacturing stations increment to `1` then click the **Pause** button. In the events panel, multiple types are displayed: `manufacturing.blocked`, `manufacturing.started`, `manufacturing.resources.acquired` and `manufacturing.completed`. 
+
+<img src="screenshots/manufacturing_parts.png" />
+<img src="screenshots/manufacturing_events.png" />
+
+Find a `manufacturing.started` event to view a list of required inputs.  For example as above, starting assembly of an electronics module requires 1 x energy, 3 x silicon and 2 x copper. These resources are acquired at each time step, if available from the **Resources Inventory**, and a `manufacturing.resources.acquired` event is published.  A `manufacturing.blocked` event indicates a manufacturing station cannot proceed due to resources not-yet available in the **Resource Inventory**.
+
+Click on any event to view full details.  In the next levels, you will learn to combine data from across events to generate new Kafka Topics and publish them into the event stream.  As you do, the UI will evolve to display deeper insights into your robotics manufacturing simulation.
+
+<img src="screenshots/manufacturing_started_details.png" />
+
+
 ### Validation & Acceptance Criteria
 
-- The Level 1 view is unlocked. Until every topic from [Step 4](#step-4-provision-your-kafka-topics) exists in Confluent, the dashboard shows "Level 1 is locked", lists the missing topics, and hides the simulation controls.
-- The dashboard shows **Connected** in the status pill.
-- Clicking **Run** boots the simulation simulation on the cloud server.
-- The simulation clock advances (`0d 00h 00m` upwards at 1 real sec = 1 sim min).
-- Resource gathering counters increment as resources arrive.
-- Stations trigger and animated dot flows pulse from Resources $\rightarrow$ Parts $\rightarrow$ Robots.
-- Simulation controls (Run, Pause, Stop, Restart) respond seamlessly.
+- The simulation dashboard will show **Connected** in the status pill if you have validate your attendee key and access token with the Simulation server.
+- The Level 1 view unlocked once all required Kafka Topics exist in Confluent.
+- Clicking **Start** initiated a simulation run on the Simulation server.
+- The simulation clock advances (`0d 00h 00m` upwards at 1 real sec = 1 simulation min).
+- Resource gathering counters increment as resources are gathered.
+- Manufacturing and robotic assembly stations will incremenet as required resources and parts are acquired.
 
 ### Next Step
 
-Proceed to **[Level 2 — Intro to Flink](../level-2-intro-to-flink/README.md)** to turn the `started` and `completed` events into job durations, like the **time to gather silicon and energy resources** and the **time to generate actuators and batteries** used to assemble each robot.
+Proceed to **[Level 2 — Intro to Flink](../level-2-intro-to-flink/README.md)** to turn the `started` and `completed` events into job durations, like the **time to gather silicon and energy resources** and the **time to generate actuators and batteries** required to assemble each robot.  These values will let you know how the production efficiency of each station 

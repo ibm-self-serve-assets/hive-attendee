@@ -195,7 +195,6 @@ const InputChips: React.FC<{
 export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
   const {
     running,
-    gathering_blocked,
     manufacturing_blocked,
     assembly_blocked,
     manufacturing_inputs,
@@ -236,7 +235,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                 {GATHERING_ORDER.map((gid) => {
                   const res = RESOURCES.find(r => r.id === gid)!;
                   const { id, label, icon } = res;
-                  const blocked = id in (gathering_blocked ?? {});
+                  const blocked = false;
                   const dur = job_durations[id];
                   const meta = RESOURCE_METADATA[id] ?? { level: 1 };
                   const slots = stationSlots[id] ?? [{ id: 1, level: meta.level }];

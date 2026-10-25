@@ -5,9 +5,11 @@ import uuid
 from typing import Optional, Callable, Awaitable
 
 from backend.models import EventEnvelope
+from backend.log_setup import MAJOR
 from backend.store import DashboardStore
 
 logger = logging.getLogger("hive.consumer")
+kafka_logger = logging.getLogger("hive.kafka")
 
 try:
     from confluent_kafka import Consumer as ConfluentConsumer, KafkaError
@@ -49,7 +51,7 @@ class EventConsumerManager:
             return
         self._running = True
         self._consumer_task = asyncio.create_task(self._run())
-        logger.info("Event consumer started.")
+        logger.info("Event consumer started.", extra=MAJOR)
 
     def stop(self):
         self._running = False
@@ -61,7 +63,7 @@ class EventConsumerManager:
             except Exception:
                 pass
             self._kafka_consumer = None
-        logger.info("Event consumer stopped.")
+        logger.info("Event consumer stopped.", extra=MAJOR)
 
     async def _run(self):
         if not (KAFKA_AVAILABLE and self.bootstrap_servers and self.api_key and self.api_secret and self.topics):
@@ -77,11 +79,12 @@ class EventConsumerManager:
             "sasl.mechanisms": "PLAIN",
             "sasl.username": self.api_key,
             "sasl.password": self.api_secret,
+            "enable.metrics.push": False,
             "group.id": group_id,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": True,
         }
-        self._kafka_consumer = ConfluentConsumer(conf)
+        self._kafka_consumer = ConfluentConsumer(conf, logger=kafka_logger)
         self._kafka_consumer.subscribe(self.topics)
 
         while self._running:
@@ -152,7 +155,7 @@ class CalculatedValuesConsumer:
             return
         self._running = True
         self._task = asyncio.create_task(self._run())
-        logger.info("CalculatedValues consumer started.")
+        logger.info("CalculatedValues consumer started.", extra=MAJOR)
 
     def stop(self) -> None:
         self._running = False
@@ -165,7 +168,7 @@ class CalculatedValuesConsumer:
             except Exception:
                 pass
             self._kafka_consumer = None
-        logger.info("CalculatedValues consumer stopped.")
+        logger.info("CalculatedValues consumer stopped.", extra=MAJOR)
 
     async def _run(self) -> None:
         if not (KAFKA_AVAILABLE and self.bootstrap_servers and self.api_key and self.api_secret):
@@ -181,6 +184,7 @@ class CalculatedValuesConsumer:
             "sasl.mechanisms": "PLAIN",
             "sasl.username": self.api_key,
             "sasl.password": self.api_secret,
+            "enable.metrics.push": False,
             "group.id": group_id,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": True,
@@ -189,7 +193,7 @@ class CalculatedValuesConsumer:
             # the commit; the store only keeps the latest value per subject.
             "isolation.level": "read_uncommitted",
         }
-        self._kafka_consumer = ConfluentConsumer(conf)
+        self._kafka_consumer = ConfluentConsumer(conf, logger=kafka_logger)
         self._kafka_consumer.subscribe([self.topic])
 
         while self._running:
@@ -269,7 +273,7 @@ class InventoryBalancesConsumer:
             return
         self._running = True
         self._task = asyncio.create_task(self._run())
-        logger.info("InventoryBalances consumer started.")
+        logger.info("InventoryBalances consumer started.", extra=MAJOR)
 
     def stop(self) -> None:
         self._running = False
@@ -282,7 +286,7 @@ class InventoryBalancesConsumer:
             except Exception:
                 pass
             self._kafka_consumer = None
-        logger.info("InventoryBalances consumer stopped.")
+        logger.info("InventoryBalances consumer stopped.", extra=MAJOR)
 
     async def _run(self) -> None:
         if not (KAFKA_AVAILABLE and self.bootstrap_servers and self.api_key and self.api_secret):
@@ -298,6 +302,7 @@ class InventoryBalancesConsumer:
             "sasl.mechanisms": "PLAIN",
             "sasl.username": self.api_key,
             "sasl.password": self.api_secret,
+            "enable.metrics.push": False,
             "group.id": group_id,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": True,
@@ -305,7 +310,7 @@ class InventoryBalancesConsumer:
             # records so the UI does not wait; the store only keeps the latest value per item.
             "isolation.level": "read_uncommitted",
         }
-        self._kafka_consumer = ConfluentConsumer(conf)
+        self._kafka_consumer = ConfluentConsumer(conf, logger=kafka_logger)
         self._kafka_consumer.subscribe([self.topic])
 
         while self._running:

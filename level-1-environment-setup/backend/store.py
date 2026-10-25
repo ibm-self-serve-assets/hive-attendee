@@ -19,10 +19,10 @@ from backend.models import EventEnvelope
 
 
 # ── Resource label / icon mapping ────────────────────────────────────────────
-RESOURCE_IDS = ["copper", "energy", "metals", "resin", "silicon"]
+RESOURCE_STATIONS = ["copper", "energy", "metals", "resin", "silicon"]
 
 # Parts manufacturing stations
-STATION_IDS = [
+MANUFACTURING_STATIONS = [
     "actuator_fabrication",
     "battery_assembly",
     "structural_molding",
@@ -42,6 +42,7 @@ EVENT_LOG_LIMIT = 100
 
 class DashboardStore:
     def __init__(self) -> None:
+        self.attendee_id: Optional[str] = None
         self.active_simulation_id: Optional[str] = None
         self.server_epoch: Optional[str] = None
         # run_id of the most recent event; matches the run_id column in hive_job_durations
@@ -58,20 +59,19 @@ class DashboardStore:
         # stream health tracking
         self._last_event_mono: float = 0.0
 
-        # Completed counts: resource_id / station_id / robot_id → int
-        self.gathering_completed: Dict[str, int] = {r: 0 for r in RESOURCE_IDS}
-        self.manufacturing_completed: Dict[str, int] = {s: 0 for s in STATION_IDS}
+        # Completed counts: station_id / station_id / robot_id → int
+        self.gathering_completed: Dict[str, int] = {r: 0 for r in RESOURCE_STATIONS}
+        self.manufacturing_completed: Dict[str, int] = {s: 0 for s in MANUFACTURING_STATIONS}
         self.assembly_completed: Dict[str, int] = {}  # output_type → count
 
         # Active jobs: tracks currently in-progress jobs per "slot"
-        # gathering: resource_id → bool
+        # gathering: station_id → bool
         # manufacturing / assembly: station_id → bool
-        self.gathering_active: Dict[str, bool] = {r: False for r in RESOURCE_IDS}
-        self.manufacturing_active: Dict[str, bool] = {s: False for s in STATION_IDS}
+        self.gathering_active: Dict[str, bool] = {r: False for r in RESOURCE_STATIONS}
+        self.manufacturing_active: Dict[str, bool] = {s: False for s in MANUFACTURING_STATIONS}
         self.assembly_active: Dict[str, bool] = {}
 
         # Blocked state: station/resource → missing_inputs dict (non-empty means blocked)
-        self.gathering_blocked: Dict[str, Dict[str, int]] = {}
         self.manufacturing_blocked: Dict[str, Dict[str, int]] = {}
         self.assembly_blocked: Dict[str, Dict[str, int]] = {}
 
@@ -81,7 +81,7 @@ class DashboardStore:
         self.assembly_inputs: Dict[str, Dict[str, int]] = {}
 
         # Job durations from hive_job_durations (Flink output):
-        # subject (resource_id / station_id) → latest elapsed_sim_minutes
+        # subject (station_id / station_id) → latest elapsed_sim_minutes
         self.job_durations: Dict[str, int] = {}
 
         # Inventory balances from hive_inventory_balances (Flink output), kept per run
@@ -117,13 +117,12 @@ class DashboardStore:
         self.run_id = None
         self.lifecycle_status = "paused"
         self.running = False
-        self.gathering_completed = {r: 0 for r in RESOURCE_IDS}
-        self.manufacturing_completed = {s: 0 for s in STATION_IDS}
+        self.gathering_completed = {r: 0 for r in RESOURCE_STATIONS}
+        self.manufacturing_completed = {s: 0 for s in MANUFACTURING_STATIONS}
         self.assembly_completed = {}
-        self.gathering_active = {r: False for r in RESOURCE_IDS}
-        self.manufacturing_active = {s: False for s in STATION_IDS}
+        self.gathering_active = {r: False for r in RESOURCE_STATIONS}
+        self.manufacturing_active = {s: False for s in MANUFACTURING_STATIONS}
         self.assembly_active = {}
-        self.gathering_blocked = {}
         self.manufacturing_blocked = {}
         self.assembly_blocked = {}
         self.manufacturing_inputs = {}
@@ -157,10 +156,9 @@ class DashboardStore:
         if env.run_generation > self.run_generation:
             self.run_generation = env.run_generation
             self.latest_sim_time_minutes = env.sim_time_minutes
-            self.gathering_completed = {r: 0 for r in RESOURCE_IDS}
-            self.manufacturing_completed = {s: 0 for s in STATION_IDS}
+            self.gathering_completed = {r: 0 for r in RESOURCE_STATIONS}
+            self.manufacturing_completed = {s: 0 for s in MANUFACTURING_STATIONS}
             self.assembly_completed = {}
-            self.gathering_blocked = {}
             self.manufacturing_blocked = {}
             self.assembly_blocked = {}
             self.manufacturing_inputs = {}
@@ -200,25 +198,16 @@ class DashboardStore:
             return True
 
         if et == "gathering.started":
-            rid = p.get("resource_id")
+            rid = p.get("station_id")
             if rid:
                 self.gathering_active[rid] = True
-                self.gathering_blocked.pop(rid, None)
             return True
 
         if et == "gathering.completed":
-            rid = p.get("resource_id")
+            rid = p.get("station_id")
             if rid:
                 self.gathering_active[rid] = False
-                self.gathering_blocked.pop(rid, None)
                 self.gathering_completed[rid] = self.gathering_completed.get(rid, 0) + 1
-            return True
-
-        if et == "gathering.blocked":
-            rid = p.get("resource_id")
-            if rid:
-                self.gathering_active[rid] = False
-                self.gathering_blocked[rid] = {"reason": p.get("reason", "")}
             return True
 
         if et == "manufacturing.resources.acquired":
@@ -289,7 +278,7 @@ class DashboardStore:
         return True
 
     def ingest_calculated_value(self, subject: str, elapsed_sim_minutes: int) -> bool:
-        """Update the latest job duration for a subject (resource_id or station_id)."""
+        """Update the latest job duration for a subject (station_id or station_id)."""
         self.job_durations[subject] = elapsed_sim_minutes
         return True
 
@@ -321,6 +310,7 @@ class DashboardStore:
     def snapshot(self) -> Dict[str, Any]:
         return {
             "stream_health": self.get_stream_health(),
+            "attendee_id": self.attendee_id,
             "active_simulation_id": self.active_simulation_id,
             "run_id": self.run_id,
             "run_generation": self.run_generation,
@@ -333,7 +323,6 @@ class DashboardStore:
             "gathering_active": dict(self.gathering_active),
             "manufacturing_active": dict(self.manufacturing_active),
             "assembly_active": dict(self.assembly_active),
-            "gathering_blocked": {k: dict(v) for k, v in self.gathering_blocked.items()},
             "manufacturing_blocked": {k: dict(v) for k, v in self.manufacturing_blocked.items()},
             "assembly_blocked": {k: dict(v) for k, v in self.assembly_blocked.items()},
             "manufacturing_inputs": {k: dict(v) for k, v in self.manufacturing_inputs.items()},

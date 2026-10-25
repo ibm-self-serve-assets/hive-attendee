@@ -30,7 +30,7 @@ CREATE TABLE `hive_job_durations` (
   `stage`               STRING,           -- gathering | manufacturing | assembly
   `started_topic`       STRING,           -- Kafka topic the started event came from
   `completed_topic`     STRING,           -- Kafka topic the completed event came from
-  `subject`             STRING,           -- resource_id (gathering) or station_id
+  `subject`             STRING,           -- station_id (gathering) or station_id
   `output_type`           STRING,           -- what the job produced
   `started_at`          TIMESTAMP(3),     -- wall-clock time of the started event (UTC)
   `completed_at`        TIMESTAMP(3),     -- wall-clock time of the completed event (UTC)

@@ -96,7 +96,6 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
     gathering_completed,
     manufacturing_completed,
     assembly_completed,
-    gathering_blocked,
     manufacturing_blocked,
     assembly_blocked,
     manufacturing_inputs,
@@ -130,7 +129,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                   const res = RESOURCES.find(r => r.id === gid)!;
                   const { id, label, icon } = res;
                   const count   = gathering_completed[id] ?? 0;
-                  const blocked = id in gathering_blocked;
+                  const blocked = false;
                   const dur     = job_durations[id];
                   return (
                     <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-center gap-2">

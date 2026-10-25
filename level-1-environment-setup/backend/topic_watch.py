@@ -4,9 +4,11 @@ import logging
 from pathlib import Path
 from typing import Awaitable, Callable, List, Optional
 
+from backend.log_setup import MAJOR
 from backend.store import DashboardStore
 
 logger = logging.getLogger("hive.topic_watch")
+kafka_logger = logging.getLogger("hive.kafka")
 
 try:
     from confluent_kafka.admin import AdminClient
@@ -53,6 +55,7 @@ class EventTopicsWatcher:
             "sasl.mechanisms": "PLAIN",
             "sasl.username": api_key,
             "sasl.password": api_secret,
+            "enable.metrics.push": False,
         }
         self._enabled = bool(KAFKA_AVAILABLE and bootstrap_servers and api_key and api_secret)
         self._task: Optional[asyncio.Task] = None
@@ -72,7 +75,7 @@ class EventTopicsWatcher:
         # is never auto-created by the metadata request.
         # Re-read the schema every poll so edits to event_payloads.json apply without a restart.
         topics = load_event_topic_names()
-        meta = AdminClient(self._conf).list_topics(timeout=5)
+        meta = AdminClient(self._conf, logger=kafka_logger).list_topics(timeout=5)
         return [
             t for t in topics
             if t not in meta.topics or meta.topics[t].error is not None
@@ -87,7 +90,8 @@ class EventTopicsWatcher:
                     self.store.event_topics_ready = ready
                     self.store.event_topics_missing = missing
                     logger.info(
-                        "Event topics ready." if ready else f"Event topics missing: {', '.join(missing)}"
+                        "Event topics ready." if ready else f"Event topics missing: {', '.join(missing)}",
+                        extra=MAJOR,
                     )
                     await self.on_change()
             except asyncio.CancelledError:
@@ -122,6 +126,7 @@ class CalculatedValuesWatcher:
             "sasl.mechanisms": "PLAIN",
             "sasl.username": api_key,
             "sasl.password": api_secret,
+            "enable.metrics.push": False,
         }
         self._enabled = bool(KAFKA_AVAILABLE and bootstrap_servers and api_key and api_secret)
         self._task: Optional[asyncio.Task] = None
@@ -139,7 +144,7 @@ class CalculatedValuesWatcher:
     def _topic_exists(self) -> bool:
         # List all topics rather than asking for this one by name, so a missing topic
         # is never auto-created by the metadata request.
-        meta = AdminClient(self._conf).list_topics(timeout=5)
+        meta = AdminClient(self._conf, logger=kafka_logger).list_topics(timeout=5)
         topic_meta = meta.topics.get(self.topic)
         return topic_meta is not None and topic_meta.error is None
 
@@ -148,7 +153,7 @@ class CalculatedValuesWatcher:
             try:
                 if await asyncio.to_thread(self._topic_exists):
                     self.store.hive_job_durations_ready = True
-                    logger.info(f"Topic {self.topic} exists; Level 2 unlocked.")
+                    logger.info(f"Topic {self.topic} exists; Level 2 unlocked.", extra=MAJOR)
                     await self.on_change()
                     return
             except asyncio.CancelledError:
@@ -184,6 +189,7 @@ class InventoryBalancesWatcher:
             "sasl.mechanisms": "PLAIN",
             "sasl.username": api_key,
             "sasl.password": api_secret,
+            "enable.metrics.push": False,
         }
         self._enabled = bool(KAFKA_AVAILABLE and bootstrap_servers and api_key and api_secret)
         self._task: Optional[asyncio.Task] = None
@@ -199,7 +205,7 @@ class InventoryBalancesWatcher:
             self._task = None
 
     def _topic_exists(self) -> bool:
-        meta = AdminClient(self._conf).list_topics(timeout=5)
+        meta = AdminClient(self._conf, logger=kafka_logger).list_topics(timeout=5)
         topic_meta = meta.topics.get(self.topic)
         return topic_meta is not None and topic_meta.error is None
 
@@ -208,7 +214,7 @@ class InventoryBalancesWatcher:
             try:
                 if await asyncio.to_thread(self._topic_exists):
                     self.store.hive_inventory_balances_ready = True
-                    logger.info(f"Topic {self.topic} exists; Level 3 unlocked.")
+                    logger.info(f"Topic {self.topic} exists; Level 3 unlocked.", extra=MAJOR)
                     await self.on_change()
                     return
             except asyncio.CancelledError:
