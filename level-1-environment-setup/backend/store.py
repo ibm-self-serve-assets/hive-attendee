@@ -152,8 +152,19 @@ class DashboardStore:
             oldest = next(iter(self._seen_ids))
             del self._seen_ids[oldest]
 
+        # An "expired" snapshot freezes the run: it must never wipe the final counts
+        # or sim time the dashboard is showing (e.g. when the server's TTL expires a
+        # freshly restarted run that is still at 0d 00h 00m).
+        is_expired_snapshot = (
+            env.event_type == "simulation.state"
+            and env.payload.get("lifecycle_status") == "expired"
+        )
+
         # Always advance sim time and record activity
-        if env.run_generation > self.run_generation:
+        if is_expired_snapshot:
+            self.run_generation = max(self.run_generation, env.run_generation)
+            self.latest_sim_time_minutes = max(self.latest_sim_time_minutes, env.sim_time_minutes)
+        elif env.run_generation > self.run_generation:
             self.run_generation = env.run_generation
             self.latest_sim_time_minutes = env.sim_time_minutes
             self.gathering_completed = {r: 0 for r in RESOURCE_STATIONS}

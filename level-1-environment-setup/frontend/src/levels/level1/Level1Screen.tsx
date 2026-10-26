@@ -53,7 +53,7 @@ export const Level1Screen: React.FC<LevelScreenProps> = ({ state }) => {
                     className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col justify-between"
                   >
                     <div className="flex items-center gap-2">
-                      <img src={icon} width={20} height={20} alt={label} />
+                      <img src={icon} width={33} height={33} alt={label} />
                       <span className="text-sm font-semibold text-[#031040]">{label}</span>
                     </div>
                     <div className="text-2xl font-bold font-mono text-[#031040] tabular-nums mt-3">
@@ -83,7 +83,7 @@ export const Level1Screen: React.FC<LevelScreenProps> = ({ state }) => {
                     className="flex items-center justify-between gap-4 rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] px-4 py-3.5"
                   >
                     <div className="flex items-center gap-3">
-                      <img src={icon} width={36} height={36} alt={label} style={{ objectFit: 'contain' }} />
+                      <img src={icon} width={60} height={60} alt={label} style={{ objectFit: 'contain' }} />
                       <span className="text-sm font-semibold text-[#031040]">{label}</span>
                     </div>
                     <div className="text-2xl font-bold font-mono text-[#031040] tabular-nums text-right">
@@ -114,7 +114,7 @@ export const Level1Screen: React.FC<LevelScreenProps> = ({ state }) => {
                   >
                     <div className="text-sm font-semibold text-[#031040] mb-3">{label}</div>
                     <div className="flex items-center justify-between gap-4">
-                      <img src={icon} width={48} height={48} alt={label} style={{ objectFit: 'contain' }} />
+                      <img src={icon} width={80} height={80} alt={label} style={{ objectFit: 'contain' }} />
                       <div className="text-3xl font-bold font-mono text-[#031040] tabular-nums">
                         {count}
                       </div>

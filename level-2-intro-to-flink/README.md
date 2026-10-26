@@ -2,7 +2,7 @@
 
 ## Overview & Goal
 
-In the Hive workshop, your simulation emits discrete lifecycle events across different Kafka topics as resources are collected, parts are manufactured, and robots are assembled. 
+In the Hive workshop, your simulation emits discrete lifecycle events across different Kafka topics as resources are collected, parts are manufactured and robots are assembled. 
 
 However, raw events tell you only what happened at an instant in time:
 - A `*.started` event announces that a job began.
@@ -11,6 +11,9 @@ However, raw events tell you only what happened at an instant in time:
 **The Problem:** There is no single event that tells you how long a job actually took, whether it ran on schedule, or how station performance is trending across stages.
 
 **Your Objective:** As a stream processing engineer, you will use **Apache Flink on Confluent Cloud** to correlate unbounded event streams in real time. You will build an interval-join pipeline that pairs started and completed events by `job_id`, calculates job durations and outputs continuous, typed performance metrics to a unified `hive_job_durations` stream.
+
+**Key Terminology:** Interval Joins, Stream-to-Stream Joins, Watermarks, Stream Windows
+
 
 ```
 ┌─────────────────────────┐
@@ -44,13 +47,13 @@ Flink will create a Kafka topic named `hive_job_durations` and publish a unified
 |---|---|---|
 | `job_id` | Shared `payload.job_id` | Correlates both events together |
 | `stage` | `gathering`, `manufacturing`, or `assembly` | Allows cross-stage filtering and grouping |
-| `subject` / `output_type` | `station_id` or `station_id` | Identifies which station or item type was worked on |
+| `output_type` | `station_id` | Identifies which station or item type was worked on |
 | `elapsed_sim_minutes` | `completed.sim_time_minutes - started.sim_time_minutes` | **Exact simulated duration.** Independent of clock drift or simulation speed. |
 | `elapsed_wall_s` | Difference between `occurred_at` timestamps | **Real-world duration in seconds.** Measures real wall-clock latency. |
 
 ---
 
-## Why Stream-to-Stream Joins Need Watermarks and Windows
+## Interval Joins: Why Stream-to-Stream Joins Need Watermarks and Windows
 
 In traditional databases, you can join two tables at any time because all rows are stored on disk. In stream processing, events arrive continuously over time over unbounded streams. 
 
@@ -63,79 +66,88 @@ AND c.row_time BETWEEN s.row_time - INTERVAL '5' SECOND AND s.row_time + INTERVA
 ```
 This tells Flink:
 1. Match records where `job_id` is identical.
-2. Only retain state for 1 minute of Kafka record time. Once a `started` event is older than 1 minute without a match, it is evicted from state, keeping memory usage minimal and bounded.
+2. Only retain state for the max expected time between tracked events.  Having implemented the simulations ourselves, we know the max time to gather resouces, manufacture parts or assemble robots is hard-coded to 30 seconds.  So the SQL code above will retain state for a max 1 minute of Kafka record time. This means once a `started` event is older than 1 minute without a match, it is evicted from state, keeping memory usage minimal and bounded.  The likelihood of this happenng due to network or compute processing latency is negligible for the simulation.
 
 ---
 
 ## Step-by-Step Instructions
 
-You will first configure your environment and run the pipeline using the **Confluent Cloud Web UI**. Once you understand how the jobs operate, you can optionally switch to the **Confluent CLI**.
+You will first configure your environment and run the pipeline using the **Confluent Cloud Web UI**. In Level 3, you will learn to perform similar commands using the **Confluent CLI**.
 
 ---
 
 ### Step 1: Initial Setup via Confluent Cloud UI
 
-> **Note on Schema Registry:** Schema Registry is already active because you selected the **Essentials** Stream Governance package when creating the `hive_dev` environment in [Level 1](../level-1-environment-setup/README.md#step-2-create-your-confluent-cloud-environment-hive_dev).
+> **Note on Schema Registry:** Schema Registry is already active because you selected the **Essentials** Stream Governance package when creating the `hive_dev` environment in **Level 1**.
 
 1. **Create Your Flink Compute Pool**:
    - From the home page of your Confluent Cloud instance, select **Environment** from the left navigation
    - Click into your `hive_dev` environment then click into **Compute Pools**.
 
-    <img src="screenshots/screenshot-0.png" alt="Add Compute Pool" width="75%" />
+    <img src="screenshots/screenshot-0.png" alt="Add Compute Pool"/>
 
    - In the left navigation, click **Flink** and go to the **Compute pools** tab.
    - Click **Add compute pool**.
 
-   <img src="screenshots/screenshot-1.png" alt="Add Compute Pool" width="75%" />
+   <img src="screenshots/screenshot-1.png" alt="Add Compute Pool"/>
 
    - Select **Google Cloud** as the provider and **Oregon (us-west)** as the region (or a region closer to you). Click **Continue**.
-
-   <img src="screenshots/screenshot-2.png" alt="Select Region" width="50%" />
+   <img src="screenshots/select_google_cloud.png" alt="Select Region"/>
 
    - Rename your **Pool name** to `hive_compute_pool` and click **Create**.
 
-   <img src="screenshots/screenshot-3.png" alt="Review and Create" width="50%" />
+   <img src="screenshots/screenshot-3.png" alt="Review and Create"/>
 
-2. **Open the Flink SQL Workspace & Set Context**:
+2. **Flink SQL Workspace**:
    - From your Compute Pool screen, click **SQL Workspace** at the top.
 
-   <img src="screenshots/screenshot-9.png" width="75%" />
+   <img src="screenshots/screenshot-9.png"/>
    
-   - **Configure Context Dropdowns:** At the right of the header bar:
-     - **Catalog**: Select `hive_dev` (your environment name as Flink refers to the **Environment** as **Catalog**)
-     - **Database**: Select your Kafka cluster name (e.g. `hive_cluster_1`, as Flink refers to the **Cluster** as **Database**)
+   - At the top-right of the **SQL Workspace**, there are two settings drop-down options:
+     - **Use catalog**: Select your Confluent Cloud environment, e.g. `hive_dev` (Flink refers to a **Confluent Environment** as a **Catalog**)
+     - **Use database**: Select your Kafka cluster, e.g. `hive_cluster_1`. (Flink refers to a **Confluent Cluster** as a **Database**)
 
-   <img src="screenshots/screenshot-10.png" width="75%" />
+   <img src="screenshots/screenshot-10.png"/>
 
-   - Click the Gear icon at top-right to edit your workspace settings:
+   - Click the Gear icon at top-right to edit your **Workspace Settings**:
      - **Rename Your Workspace:** to **`hive_job_durations`**.
      - **Compute pool**: Select your newly created pool (e.g. `hive_compute_pool`).
+     - **Save Changes**: DO NOT click the X to close this window.  You must click **Save Changes** (located at bottom-right of Workspace Settings)!
 
-    <img src="screenshots/screenshot-11.png" width="35%" />
+    <img src="screenshots/workspace_settings.png"/>
    
 ---
 
 ### Step 2: Execute Flink SQL Statements in the Workspace
 
 #### A. Ensure Simulation Data is Flowing
-Start by ensuring your dashboard is:
-- Connected to the Hive simulation server and running (see [Level 1, Step 8](../level-1-environment-setup/README.md#step-8-run-your-simulation)).
-- The simulation timer should be incrementing up.
-- This ensures Kafka events are actively published to `gathering-*`, `manufacturing-*`, and `assembly-*` topics.
+Before proceeding, ensure your Simulation Dashboard is:
+- Connected to the Hive simulation server and running.
+- The simulation timer is incrementing up.
+- This ensures Kafka events are being actively published to `gathering-*`, `manufacturing-*`, and `assembly-*` topics.
 
-<img src="screenshots/screenshot-12.png" width="15%" />
+<img src="screenshots/screenshot-12.png" width="35%" />
 
 #### B. Prepare SQL execution windows
-1. Click the **+** button next to the SQL workspace cell **twice** so you have a total of 3 workspace cells.
+1. Click twice (2 x) on the **+** button at top-right of the SQL execution cell, so you have a total of 3 SQL execution cells.
 2. If there is text in the first cell, delete as it's not needed.
 
-<img src="screenshots/screenshot-13.png" width="75%" />
+<img src="screenshots/screenshot-13.png" />
 
 #### C. Create the Sink Table
 1. Open [`flink/01_create_sink.sql`](flink/01_create_sink.sql).
-2. Copy the entire SQL statement, paste it into the **first workspace cell** and click **Run**.
+2. Copy the entire SQL statement and paste it into the **first workspace cell**.
+3. Before clicking **Run**, check the **Mode** selector at the bottom-right of the cell. Set it to **Snapshot** (not Streaming).
+   - **Snapshot** — runs once and returns a final result set. Correct for DDL statements like `CREATE TABLE`.
+   - **Streaming** — keeps the statement alive as a continuous job. This is for DML queries in the next step.
+4. Click **Run**.
   - **What this does:** Registers the `hive_job_durations` table in Flink, generates the registered schema in Schema Registry, and creates the underlying Kafka topic with `append` changelog mode.
-  - **Expected status:** **Completed**. This DDL statements executes once and finishes immediately.
+  - **Expected status:** **Completed**. This DDL statement executes once and finishes immediately.
+  - **If you see `Schema Registry subject 'hive_job_durations-value' doesn't match the existing one`:** A previous run left stale Schema Registry subjects that must be deleted manually. `DROP TABLE` alone is not sufficient. Follow these steps in order:
+    1. In your `hive_dev` environment, click **Schema Registry** → **Subjects** tab.
+    2. Find and delete **`hive_job_durations-value`** and **`hive_job_durations-key`** (if present). Click into each subject → **Delete subject** → confirm.
+    3. Navigate to your Kafka cluster → **Topics**. If `hive_job_durations` still exists, delete it.
+    4. Re-run `01_create_sink.sql` in this cell (Snapshot mode).
 
 <img src="screenshots/screenshot-14.png" width="75%" />
 
