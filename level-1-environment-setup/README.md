@@ -5,13 +5,13 @@ Welcome to **Level 1** of the Hive Robotics Workshop!
 Over the next 15-20 mins, you will set up your development environment.  This includes:
 
 1. Configuring your Confluent Cloud instance
-2. Entering your Confluent and workshop credentials into [spec-shared/.env](../spec-shared/.env)
-3. Provisioning the Kafka topics your simulation publishes to
+2. Creating a copy of [spec-shared/.env.example](../spec-shared/.env.example) and entering your Confluent and workshop credentials.
+3. Provisioning the Kafka topics your simulation publishes into your Confluent Cloud instance.
 4. Run your backend FastAPI server and a React NodeJS frontend
 5. Launch the **Hive Dashboard** to get a first view your personal Hive simulation of a vertically integrated robotics manufacturing process.
 
 This workshop's documentation highlights why event-driven architectures is powerful, but we recommend spending time learning from these materials as well:
-- Read O'Reilly's Building Event Driven Microservices to fully understand how to best implement these architectures yourself.  Your own copy of [Building Event Driven Microservices is in level-1-environment-setup/assets](assets).
+- Read O'Reilly's Building Event Driven Microservices to fully understand how to best implement these architectures yourself.  Your own PDF copy of **Building Event Driven Microservices** is in root directory of Level 1. Look for `confluent_building_event_driven_microservices.pdf`.
 - Visit the Confluent Developer site to watch a series of short videos about [Designing Event-Driven Microservices](https://developer.confluent.io/courses/microservices/overview/).
 
 
