@@ -157,13 +157,13 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
   return (
     <div className="flex-1 overflow-auto p-6">
-      <div className="flex items-start gap-4 min-w-0">
+      <div className="flex items-start gap-[5.33px] min-w-0">
 
         {/* ── Lane 1: Resource gathering ──────────────────────────────────── */}
         <section className="flex-none" style={{ minWidth: 300 }}>
           <div
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
-            style={{ minHeight: 480 }}
+            style={{ minHeight: 604 }}
           >
             <h2 className="text-[#2850B8] font-bold text-base mb-4">Resources Gathered</h2>
             <div className="grid grid-cols-2 gap-3">
@@ -206,7 +206,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
         <section className="flex-none" style={{ width: 420 }}>
           <div
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
-            style={{ minHeight: 480 }}
+            style={{ minHeight: 604 }}
           >
             <h2 className="text-[#2850B8] font-bold text-base mb-4">Parts Manufactured</h2>
             <div className="flex flex-col gap-3">
@@ -254,10 +254,10 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
         <FlowDots running={state.running} />
 
         {/* ── Lane 3: Robot assembly ───────────────────────────────────────── */}
-        <section className="flex-none" style={{ width: 260 }}>
+        <section className="flex-none" style={{ width: 420 }}>
           <div
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
-            style={{ minHeight: 480 }}
+            style={{ minHeight: 604 }}
           >
             <h2 className="text-[#2850B8] font-bold text-base mb-4">Robots Assembled</h2>
             <div className="flex flex-col gap-3">
