@@ -35,7 +35,7 @@ export const Level1Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
   return (
     <div className="flex-1 overflow-auto p-6">
-      <div className="flex items-start gap-8 min-w-0">
+      <div className="flex items-start gap-4 min-w-0">
 
         {/* ── Lane 1: Resource gathering ─────────────────────────────── */}
         <section className="flex-none" style={{ minWidth: 300 }}>
@@ -68,7 +68,7 @@ export const Level1Screen: React.FC<LevelScreenProps> = ({ state }) => {
         </section>
 
         {/* ── Lane 2: Parts manufacturing ────────────────────────────── */}
-        <section className="flex-none" style={{ minWidth: 280 }}>
+        <section className="flex-none" style={{ width: 380 }}>
           <div
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
             style={{ minHeight: 480 }}
@@ -98,12 +98,12 @@ export const Level1Screen: React.FC<LevelScreenProps> = ({ state }) => {
         </section>
 
         {/* ── Lane 3: Robot assembly ─────────────────────────────────── */}
-        <section className="flex-none" style={{ minWidth: 220 }}>
+        <section className="flex-none" style={{ width: 240 }}>
           <div
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
             style={{ minHeight: 480 }}
           >
-            <h2 className="font-bold text-base text-[#031040] mb-4">Assemble robots</h2>
+            <h2 className="text-[#2850B8] font-bold text-base mb-4">Assemble robots</h2>
             <div className="flex flex-col gap-3">
               {ROBOTS.map(({ id, label, icon }) => {
                 const count = assembly_completed[id] ?? 0;

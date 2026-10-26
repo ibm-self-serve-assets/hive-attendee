@@ -59,14 +59,14 @@ In traditional databases, you can join two tables at any time because all rows a
 
 If Flink joined streams without time constraints, it would have to keep every `started` event in memory forever waiting for a possible `completed` event, eventually exhausting memory.
 
-To solve this, our Flink queries use an **Interval Join**:
+To solve this, your Flink queries use an **Interval Join**:
 ```sql
 ON  s.job_id = c.job_id
 AND c.row_time BETWEEN s.row_time - INTERVAL '5' SECOND AND s.row_time + INTERVAL '1' MINUTE;
 ```
 This tells Flink:
 1. Match records where `job_id` is identical.
-2. Only retain state for the max expected time between tracked events.  Having implemented the simulations ourselves, we know the max time to gather resouces, manufacture parts or assemble robots is hard-coded to 30 seconds.  So the SQL code above will retain state for a max 1 minute of Kafka record time. This means once a `started` event is older than 1 minute without a match, it is evicted from state, keeping memory usage minimal and bounded.  The likelihood of this happenng due to network or compute processing latency is negligible for the simulation.
+2. Only retain state for the max expected time between tracked events.  Having implemented the simulations ourselves, you know the max time to gather resouces, manufacture parts or assemble robots is hard-coded to 30 seconds.  So the SQL code above will retain state for a max 1 minute of Kafka record time. This means once a `started` event is older than 1 minute without a match, it is evicted from state, keeping memory usage minimal and bounded.  The likelihood of this happenng due to network or compute processing latency is negligible for the simulation.
 
 ---
 
@@ -136,42 +136,37 @@ Before proceeding, ensure your Simulation Dashboard is:
 
 #### C. Create the Sink Table
 1. Open [`flink/01_create_sink.sql`](flink/01_create_sink.sql).
-2. Copy the entire SQL statement and paste it into the **first workspace cell**.
+2. Copy the entire SQL statement and paste into the **first workspace cell**.
 3. Before clicking **Run**, check the **Mode** selector at the bottom-right of the cell. Set it to **Snapshot** (not Streaming).
    - **Snapshot** — runs once and returns a final result set. Correct for DDL statements like `CREATE TABLE`.
-   - **Streaming** — keeps the statement alive as a continuous job. This is for DML queries in the next step.
+   - **Streaming** — keeps the statement alive as a continuous job. This is for DML queries like in the next step.
 4. Click **Run**.
   - **What this does:** Registers the `hive_job_durations` table in Flink, generates the registered schema in Schema Registry, and creates the underlying Kafka topic with `append` changelog mode.
   - **Expected status:** **Completed**. This DDL statement executes once and finishes immediately.
-  - **If you see `Schema Registry subject 'hive_job_durations-value' doesn't match the existing one`:** A previous run left stale Schema Registry subjects that must be deleted manually. `DROP TABLE` alone is not sufficient. Follow these steps in order:
-    1. In your `hive_dev` environment, click **Schema Registry** → **Subjects** tab.
-    2. Find and delete **`hive_job_durations-value`** and **`hive_job_durations-key`** (if present). Click into each subject → **Delete subject** → confirm.
-    3. Navigate to your Kafka cluster → **Topics**. If `hive_job_durations` still exists, delete it.
-    4. Re-run `01_create_sink.sql` in this cell (Snapshot mode).
 
 <img src="screenshots/screenshot-14.png" width="75%" />
 
 #### D. Deploy the Stream Processing Jobs
 1. Open [`flink/02_run_jobs.sql`](flink/02_run_jobs.sql).
-2. Copy the entire `EXECUTE STATEMENT SET ... BEGIN ... END;` block, paste it into the **second workspace cell** and click **Run**.
+2. Copy the entire SQL statement, paste into the **second workspace cell** and click **Run**.
   - **What this does:** Submits three continuous streaming jobs (gathering, manufacturing, assembly) bundled into a single Flink statement. Flink continuously joins incoming `started` and `completed` events and writes the correlated duration records into `hive_job_durations`.
   - **Expected status:** **Running**. Unlike the earlier DDL commands creating the Sink table, stream processing queries are continuous, long-running background jobs that stay active on your compute pool, listening for incoming Kafka events and calculating durations in real time.
   - Ignore the warning.  This is because the simulation event producer is not using the Confluent's Schema Registry to keep this workshop simple to start.
-3. So do **not** click **Stop**.  Clicking the red **Stop** button cancels and terminates your background Flink streaming pipeline.
-  - After the next step, we will close this SQL Workspace while leaving this stream processing queries running in the background.
+3. So do **NOT** click **Stop**.  Clicking the **Stop** button cancels and terminates your background Flink streaming pipeline.
+  - After the next step, you will close this SQL Workspace while leaving this stream processing queries running in the background.
 
-<img src="screenshots/screenshot-15.png" width="75%" />
+<img src="screenshots/hive_job_durations_running.png" width="75%" />
 
 #### E. Validate the Streaming Output
 1. Open [`flink/03_validate.sql`](flink/03_validate.sql).
 2. Copy the entire SQL block, paste it into the **third workspace cell** and click **Run**.
 3. Wait up to a minute to confirm derived duration records are being generated by Flink. The first rows are slow to appear because Flink commits its output about once a minute.
-4. Once you have verified records are being generated, click **Stop** as this 3rd command does not need to run anymore.
+4. Once you have verified records are being generated, click **Stop** as this 3rd command (unlike the prior 2nd statement) does not need to run anymore.
 
 <img src="screenshots/screenshot-16.png" width="75%" />
 
 #### F. Close this SQL workspace
-Click the **x** next to the SQL Workspace name to close it as we are done.
+Scroll to the top of the SQL Workspace, find the tab at top-left marked **hive_job_durations** and click the **x** to close it, as you are done.  This will leave the 2nd SQL statement continuously processing your Kafka   stream.
 
 <img src="screenshots/screenshot-17.png" width="25%" />
 
@@ -183,30 +178,55 @@ To inspect and verify your active streaming statement running on your compute po
 
 <img src="screenshots/screenshot-18.png" width="75%" />
 
-> **Dashboard unlock:** In the dashboard, choosing **Level 2** from the Levels dropdown hides the simulation controls and shows what is required, until the `hive_job_durations` topic exists. Running `01_create_sink.sql` creates it, so the controls appear shortly after that step. The topic holds no records until the simulation runs, so start it afterwards.
-
-> **⚠️ Gate Check — Do Not Proceed If Not Running:**
-> Your statement status must be **Running**. If it is stopped or missing, verify that your simulation simulation is running, ensure your compute pool is active, and re-run [`flink/02_run_jobs.sql`](flink/02_run_jobs.sql).
+> **************************************************
+> ## ⚠️ Gate Check
+> Do not proceed if your 2nd SQL statement is not running.
+> Your statement status must be **Running**. 
+> If it is not running, you cannot access level 2.
+> **************************************************
 
 4. Click on the statement name to open its **Statement Details** page:
 
-<img src="screenshots/screenshot-7.png" alt="Statement Details Overview" width="75%" />
+<img src="screenshots/statement_details_overview.png"/>
 
-- **Catalog & Cluster:** Confirms binding to `hive_dev` and `hive_cluster_1`.
-- **Throughput by Table:** Shows live messages in and out across `gathering-*`, `manufacturing-*`, and `assembly-*` topics.
-- **SQL Definition:** Displays the running statement set and joins.
+- **Table:** Shows live messages in and out across `gathering-*`, `manufacturing-*`, and `assembly-*` topics.
+- **SQL:** Displays the running statement set and joins.
 
 5. Scroll down to inspect the **Activity Trends** charts:
 
-<img src="screenshots/screenshot-8.png" alt="Activity Trends & Performance Metrics" width="75%" />
+<img src="screenshots/activity_trends_performance_metrics.png"/>
 
 - **Statement CFU:** Shows Confluent Flink Units allocated to this pipeline.
 - **Messages behind (Lag):** Confirms Flink is processing in real time with near-zero lag.
 - **Messages in/out per minute:** Visualizes incoming simulation events and derived duration records being produced.
 
+### Step 3: Level 2 Dashboard Unlocked !!
+
+With the `hive_job_durations` Kafka topic being produced by Flink, you have unlocked access to Level 2. Go to your Hive Dashboard and select **Level 2**.  You can see the updated UI with Flink's calculations visible.  
+
+We can see that the Resource Gathering stations are operating at different speeds while the Manufacturing and Assembly stations process one item each every 10 seconds (assuming resources and parts are available).  The progress spinners are calibrated to complete their cycles at same speed as their parent stations processing times.
+
+When exploring the Events earlier by clicking to expand their contents, you may have noticed `manufacturing.started` and `assembly.started` events declare the # of each resource/part required to start manufacturing/assembly.  Those numbers have been added to the Dashboard for clarity.  
+
+In addition, a warning rectangle <img src="../level-1-environment-setup/frontend/public/icons/png/warning.png" width="24px"/> is displayed when a station is blocked due to a `manufacturing.blocked` or `assembly.blocked` event.
+
+<img src="screenshots/level_2_dashboard.png"/>
+
+### Step 4: Vital Information is missing
+
+Your dashboard is still missing critical datapoints required to optimize your manufacturing workflow.  In upcoming levels, you will use Flink to further process Simulation events to calculate these datapoints:
+
+#### Resource and Parts Inventories
+
+The total # of gathered resources and manufactured parts are visible.  However Resources have been acquired to produce Parts and Parts have been acquired to assemble Robots.  With your current events, you can't determine which Resources and Parts are over-supplied and which are bottlenecks.  So upir can't yet determine  which stations to upgrade first.
+
+#### Orders and Treasury
+
+If you were really paying attention, you would have noticed events related to **Orders** and **Treasury**.  After all, why are you manufacturing robots unless someone placed an order for them.  And while it might be nice to give robots away for free, your manufacturing workflow is generating revenue that is tracked in your Treasury.  But more about that in a later level.
+
 ---
 
 ## Next Step
 
-Return to your Hive Dashboard and select Level 2.  Now that the `hive_job_durations` topic exists, you can see the updated UI with Flink's calculations visible.  After exploring the new UI, proceed to **[Level 3 — Real-time Inventory](../level-3-hive-inventory/README.md)**. Level 3 introduces the Confluent CLI and builds live inventory balances using stateful Flink aggregations.
+After exploring the new UI, proceed to **[Level 3 — Real-time Inventory](../level-3-hive-inventory/README.md)**. Level 3 introduces the Confluent CLI and builds live inventory balances using stateful Flink aggregations.
 

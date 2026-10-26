@@ -51,10 +51,10 @@ const InputChip: React.FC<{
   icon: string;
   qty: number;
   blocked?: boolean;
-}> = ({ icon, qty, blocked }) => (
+}> = ({ icon, qty }) => (
   <span
     className="inline-flex items-center gap-0.5"
-    style={{ color: blocked ? '#C75000' : '#57606A' }}
+    style={{ color: '#57606A' }}
   >
     <img
       src={icon}
@@ -63,7 +63,7 @@ const InputChip: React.FC<{
       alt=""
       style={{
         objectFit: 'contain',
-        opacity: blocked ? 1 : 0.85,
+        opacity: 0.85,
       }}
     />
     <span className="text-xs font-semibold tabular-nums" style={{ fontSize: 11 }}>
@@ -157,7 +157,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
   return (
     <div className="flex-1 overflow-auto p-6">
-      <div className="flex items-start gap-8 min-w-0">
+      <div className="flex items-start gap-4 min-w-0">
 
         {/* ── Lane 1: Resource gathering ──────────────────────────────────── */}
         <section className="flex-none" style={{ minWidth: 300 }}>
@@ -203,7 +203,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
         <FlowDots running={state.running} />
 
         {/* ── Lane 2: Parts manufacturing ─────────────────────────────────── */}
-        <section className="flex-none" style={{ minWidth: 300 }}>
+        <section className="flex-none" style={{ width: 420 }}>
           <div
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
             style={{ minHeight: 480 }}
@@ -254,7 +254,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
         <FlowDots running={state.running} />
 
         {/* ── Lane 3: Robot assembly ───────────────────────────────────────── */}
-        <section className="flex-none" style={{ minWidth: 260 }}>
+        <section className="flex-none" style={{ width: 260 }}>
           <div
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
             style={{ minHeight: 480 }}
