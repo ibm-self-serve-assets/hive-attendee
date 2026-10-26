@@ -22,7 +22,7 @@ Head to **[Level 1 — Environment Setup](level-1-environment-setup/README.md)**
 
 ## Architecture
 
-<a href="assets/hive_architecture.png"><img src="assets/hive_architecture.png" width="50%" alt="Hive Architecture"/></a>
+<a href="assets/hive_architecture.png"><img src="assets/hive_architecture.png"/></a>
 
 The HIVE platform is built around an event-driven architecture connecting a hosted simulation engine, cloud-native streaming data pipelines, and a local attendee dashboard:
 
