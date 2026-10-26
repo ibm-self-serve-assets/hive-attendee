@@ -17,6 +17,18 @@ export interface HiveEvent {
 
 export type EventSection = 'gathering' | 'manufacturing' | 'assembly';
 
+/** A plain-language connection problem reported by the backend (backend/connection_issues.py). */
+export interface ConnectionIssue {
+  code: string;
+  /** Where the problem is: the local .env ('config'), the simulation server, or Confluent. */
+  source: 'config' | 'simulation_server' | 'confluent';
+  title: string;
+  /** What went wrong. */
+  message: string;
+  /** Technical detail from the underlying error, if any. */
+  detail?: string | null;
+}
+
 /** Shape of the state object sent from the backend SSE stream. */
 export interface DashboardState {
   stream_health: 'live' | 'stale' | 'awaiting_events';
@@ -72,6 +84,11 @@ export interface DashboardState {
 
   // True once the hive_inventory_balances topic exists (created by the attendee's Flink SQL) (unlocks Level 3)
   hive_inventory_balances_ready: boolean;
+
+  // Whether the backend has connected your dashboard to the simulation server and Confluent.
+  connection_status: 'connecting' | 'connected' | 'failed';
+  // Why the connection failed; empty unless connection_status is 'failed'.
+  connection_issues: ConnectionIssue[];
 }
 
 export const EMPTY_STATE: DashboardState = {
@@ -100,6 +117,8 @@ export const EMPTY_STATE: DashboardState = {
   event_topics_missing: [],
   hive_job_durations_ready: false,
   hive_inventory_balances_ready: false,
+  connection_status: 'connecting',
+  connection_issues: [],
 };
 
 /**

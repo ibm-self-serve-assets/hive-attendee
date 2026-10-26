@@ -1,9 +1,10 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Tuple
 
 import httpx
 from fastapi import FastAPI, Request, Header, HTTPException, status
@@ -11,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from backend import connection_issues as ci
 from backend.config import BackendConfig
 from backend.log_setup import LOG_FILE, MAJOR
 from backend.store import DashboardStore
@@ -121,14 +123,91 @@ async def lifespan(app: FastAPI):
         consumer_mgr.stop()
 
 
+PROVISION_WAIT_SECONDS = 45
+_connect_lock = asyncio.Lock()
+
+
+async def _set_connection(conn_status: str, issues: Optional[List[ci.Issue]] = None) -> None:
+    """Record the connection state, log any problems to the console, and tell the dashboard."""
+    issues = issues or []
+    store.connection_status = conn_status
+    store.connection_issues = [i.to_dict() for i in issues]
+    for issue in issues:
+        logger.error("\n" + ci.format_for_console(issue))
+    await notify_subscribers(store.snapshot())
+
+
+def _response_body(r: httpx.Response) -> Any:
+    try:
+        return r.json()
+    except ValueError:
+        return r.text
+
+
+def _connect_failure_message(default: str) -> str:
+    """Plain-language reason the last connection attempt failed, for command error replies."""
+    if store.connection_issues:
+        first = store.connection_issues[0]
+        return f"{first['title']}. {first['message']}" if first.get("message") else first["title"]
+    return default
+
+
+async def _check_sim_server(
+    client: httpx.AsyncClient, headers: Dict[str, str]
+) -> Tuple[Optional[str], Optional[ci.Issue]]:
+    """Confirm the URL, access token and attendee ID by asking the server for its epoch."""
+    try:
+        r = await client.get(f"{config.simulation_server_url}/v1/server", headers=headers)
+    except (httpx.RequestError, httpx.InvalidURL) as e:
+        return None, ci.classify_network_error(config, e)
+    if r.status_code >= 400:
+        return None, ci.classify_http_error(config, r.status_code, _response_body(r))
+    body = _response_body(r)
+    epoch = body.get("server_epoch") if isinstance(body, dict) else None
+    if not epoch:
+        return None, ci.not_a_simulation_server(config)
+    return epoch, None
+
+
+async def _wait_for_provisioning(
+    client: httpx.AsyncClient, headers: Dict[str, str]
+) -> Tuple[Optional[Dict[str, Any]], Optional[ci.Issue]]:
+    """
+    Poll until the server's verification of the Confluent cluster finishes.
+    Returns (simulation detail, None) when ready, or (None, Issue) when it failed or timed out.
+    """
+    deadline = time.monotonic() + PROVISION_WAIT_SECONDS
+    while time.monotonic() < deadline:
+        await asyncio.sleep(0.25)
+        r = await client.get(
+            f"{config.simulation_server_url}/v1/simulations/{store.active_simulation_id}",
+            headers=headers,
+        )
+        if r.status_code != 200:
+            continue
+        data = r.json()
+        lifecycle = data.get("lifecycle_status")
+        if lifecycle == "provisioning_failed":
+            return None, ci.from_server_diagnostic(data.get("provisioning_error"))
+        if lifecycle not in ("provisioning", None):
+            return data, None
+    return None, ci.provisioning_timeout(config, PROVISION_WAIT_SECONDS)
+
+
 async def auto_connect():
+    # One attempt at a time; a caller that arrives mid-attempt waits for it, then runs again.
+    async with _connect_lock:
+        await _auto_connect()
+
+
+async def _auto_connect():
     global consumer_mgr
     store.attendee_id = config.attendee_id
-    if not config.workshop_access_token:
-        logger.warning("AUTO-CONNECT: WORKSHOP_ACCESS_TOKEN missing — skipping")
-        return
-    if not (config.confluent_bootstrap_server and config.confluent_api_key and config.confluent_api_secret):
-        logger.warning("AUTO-CONNECT: Confluent credentials missing — skipping")
+    await _set_connection("connecting")
+
+    config_issues = ci.validate_config(config)
+    if config_issues:
+        await _set_connection("failed", config_issues)
         return
 
     headers = {"Authorization": f"Bearer {config.workshop_access_token}"}
@@ -137,28 +216,34 @@ async def auto_connect():
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Server epoch
-            r = await client.get(f"{config.simulation_server_url}/v1/server", headers=headers)
-            r.raise_for_status()
-            epoch = r.json().get("server_epoch")
+            # Check both ends before provisioning, and report everything that is wrong at once.
+            epoch, server_issue = await _check_sim_server(client, headers)
+            confluent_issue = await asyncio.to_thread(ci.check_confluent, config)
+            problems = [i for i in (server_issue, confluent_issue) if i]
+            if problems:
+                await _set_connection("failed", problems)
+                return
             store.server_epoch = epoch
 
             # Find or provision simulation
             topics_map: Dict[str, str] = {}
+            wait_for_ready = False
             f_resp = await client.get(f"{config.simulation_server_url}/v1/simulations", headers=headers)
             if f_resp.status_code == 200:
                 facts = f_resp.json().get("simulations", [])
                 if facts:
                     f0 = facts[0]
-                    if f0.get("lifecycle_status") == "expired":
-                        logger.info(f"AUTO-CONNECT: Simulation {f0['simulation_id'][:8]} is expired; will provision fresh simulation", extra=MAJOR)
+                    f0_status = f0.get("lifecycle_status")
+                    if f0_status in ("expired", "provisioning_failed"):
+                        logger.info(f"AUTO-CONNECT: Simulation {f0['simulation_id'][:8]} is {f0_status}; will provision fresh simulation", extra=MAJOR)
                         store.active_simulation_id = None
                     else:
                         store.active_simulation_id = f0["simulation_id"]
                         store.server_epoch = f0["server_epoch"]
-                        store.lifecycle_status = f0.get("lifecycle_status", store.lifecycle_status)
+                        store.lifecycle_status = f0_status or store.lifecycle_status
                         store.running = f0.get("running", store.running)
                         topics_map = f0.get("topics", {})
+                        wait_for_ready = f0_status == "provisioning"
                         logger.info(f"AUTO-CONNECT: Reconnected to simulation {f0['simulation_id'][:8]}…", extra=MAJOR)
 
             if not store.active_simulation_id:
@@ -185,24 +270,19 @@ async def auto_connect():
                 prov_data = prov_r.json()
                 store.active_simulation_id = prov_data["simulation_id"]
                 store.reset()
+                wait_for_ready = True
                 logger.info(f"AUTO-CONNECT: Simulation provisioned {store.active_simulation_id[:8]}… waiting for probe verification", extra=MAJOR)
 
-                # Poll until verification probes pass and lifecycle leaves 'provisioning'
-                for _ in range(30):  # poll up to 6 seconds (30 * 200ms)
-                    await asyncio.sleep(0.2)
-                    fdetail_r = await client.get(
-                        f"{config.simulation_server_url}/v1/simulations/{store.active_simulation_id}",
-                        headers=headers,
-                    )
-                    if fdetail_r.status_code == 200:
-                        fdata = fdetail_r.json()
-                        status = fdata.get("lifecycle_status")
-                        if status not in ("provisioning", None):
-                            topics_map = fdata.get("topics", {})
-                            store.lifecycle_status = status
-                            store.running = (status == "running")
-                            logger.info(f"AUTO-CONNECT: Simulation ready with status '{status}'", extra=MAJOR)
-                            break
+            if wait_for_ready:
+                ready, issue = await _wait_for_provisioning(client, headers)
+                if issue:
+                    store.active_simulation_id = None
+                    await _set_connection("failed", [issue])
+                    return
+                topics_map = ready.get("topics", {})
+                store.lifecycle_status = ready["lifecycle_status"]
+                store.running = (store.lifecycle_status == "running")
+                logger.info(f"AUTO-CONNECT: Simulation ready with status '{store.lifecycle_status}'", extra=MAJOR)
 
             if topics_map:
                 topic_list = list(topics_map.values())
@@ -218,26 +298,16 @@ async def auto_connect():
                 )
                 consumer_mgr.start()
                 logger.info(f"AUTO-CONNECT: Consumer started on {len(topic_list)} topics", extra=MAJOR)
-                await notify_subscribers(store.snapshot())
             else:
                 logger.warning("AUTO-CONNECT: No topics — consumer not started")
 
+            await _set_connection("connected")
+
     except httpx.HTTPStatusError as e:
-        detail_msg = ""
-        try:
-            err_json = e.response.json()
-            if isinstance(err_json, dict) and "detail" in err_json:
-                d = err_json["detail"]
-                detail_msg = d.get("message") if isinstance(d, dict) else str(d)
-            elif isinstance(err_json, dict) and "message" in err_json:
-                detail_msg = err_json["message"]
-            else:
-                detail_msg = str(err_json)
-        except Exception:
-            detail_msg = e.response.text or str(e)
-        logger.error(f"AUTO-CONNECT: HTTP {e.response.status_code} from sim server: {detail_msg}")
+        issue = ci.classify_http_error(config, e.response.status_code, _response_body(e.response))
+        await _set_connection("failed", [issue])
     except Exception as e:
-        logger.error(f"AUTO-CONNECT: {e}")
+        await _set_connection("failed", [ci.classify_network_error(config, e)])
 
 
 app = FastAPI(title="Hive Connect-Simulation Backend", version="1.0.0", lifespan=lifespan)
@@ -263,13 +333,7 @@ class ControlCommandRequest(BaseModel):
 
 @app.get("/api/config")
 async def get_config():
-    fully_configured = bool(
-        config.simulation_server_url
-        and config.workshop_access_token
-        and config.confluent_bootstrap_server
-        and config.confluent_api_key
-    )
-    return {"fully_configured": fully_configured}
+    return {"fully_configured": not ci.validate_config(config)}
 
 
 @app.get("/api/status")
@@ -277,18 +341,15 @@ async def get_status():
     return store.snapshot()
 
 
-@app.post("/api/connect")
-async def retry_connect():
-    asyncio.create_task(auto_connect())
-    return {"status": "connecting"}
-
-
 @app.post("/api/controls")
 async def send_control(
     req: ControlCommandRequest,
 ):
     if not config.workshop_access_token:
-        raise HTTPException(status_code=400, detail={"error_code": "not_connected", "message": "No access token configured"})
+        raise HTTPException(status_code=400, detail={
+            "error_code": "not_connected",
+            "message": _connect_failure_message("WORKSHOP_ACCESS_TOKEN is not set in spec-shared/.env."),
+        })
 
     if req.command not in ("start", "pause", "stop", "restart"):
         raise HTTPException(status_code=422, detail="Invalid command")
@@ -298,11 +359,17 @@ async def send_control(
             logger.info("Restart requested with no active simulation; provisioning fresh simulation...", extra=MAJOR)
             await auto_connect()
             if not store.active_simulation_id:
-                raise HTTPException(status_code=500, detail={"error_code": "provision_failed", "message": "Failed to provision new simulation"})
+                raise HTTPException(status_code=500, detail={
+                    "error_code": "provision_failed",
+                    "message": _connect_failure_message("Failed to provision new simulation"),
+                })
             if req.start is not False:
                 return await _send_server_command("start")
             return {"lifecycle_status": store.lifecycle_status, "simulation_id": store.active_simulation_id}
-        raise HTTPException(status_code=400, detail={"error_code": "not_connected", "message": "No active simulation"})
+        raise HTTPException(status_code=400, detail={
+            "error_code": "not_connected",
+            "message": _connect_failure_message("No active simulation. Restart the backend."),
+        })
 
     cmd_url = f"{config.simulation_server_url}/v1/simulations/{store.active_simulation_id}/{req.command}"
     headers = {
@@ -327,7 +394,10 @@ async def send_control(
             store.active_simulation_id = None
             await auto_connect()
             if not store.active_simulation_id:
-                raise HTTPException(status_code=500, detail={"error_code": "provision_failed", "message": "Failed to re-sync simulation after server reload/restart"})
+                raise HTTPException(status_code=500, detail={
+                    "error_code": "provision_failed",
+                    "message": _connect_failure_message("Failed to re-sync simulation after server reload/restart"),
+                })
             target_cmd = "start" if (req.command == "restart" and req.start is not False) or req.command == "start" else req.command
             return await _send_server_command(target_cmd)
 

@@ -25,7 +25,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isLive = stream_health === 'live';
   const isExpired = lifecycle_status === 'expired';
   const isStopped = lifecycle_status === 'stopped';
-  const hasSimulation = Boolean(active_simulation_id);
+  const connectionFailed = state.connection_status === 'failed';
+  const hasSimulation = Boolean(active_simulation_id) && !connectionFailed;
   const hasState = stream_health !== 'awaiting_events' || hasSimulation;
   const level = LEVELS.find((l) => l.id === levelId) ?? LEVELS[0];
   const isUnlocked = level.isUnlocked ? level.isUnlocked(state) : true;
@@ -73,11 +74,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center gap-2 text-white text-sm mb-3">
             <span
               className={`w-2.5 h-2.5 rounded-full ${
-                stream_health === 'stale' ? 'bg-amber-400' : isLive || hasSimulation ? 'bg-emerald-400' : 'bg-[#4A5A8A]'
+                connectionFailed
+                  ? 'bg-red-500'
+                  : stream_health === 'stale'
+                    ? 'bg-amber-400'
+                    : isLive || hasSimulation
+                      ? 'bg-emerald-400'
+                      : 'bg-[#4A5A8A]'
               }`}
             />
             <span>
-              {isLive ? 'Connected' : stream_health === 'stale' ? 'Stale' : hasSimulation ? 'Connected' : 'Connecting'}
+              {connectionFailed
+                ? 'Not connected'
+                : isLive
+                  ? 'Connected'
+                  : stream_health === 'stale'
+                    ? 'Stale'
+                    : hasSimulation
+                      ? 'Connected'
+                      : 'Connecting'}
             </span>
           </div>
 

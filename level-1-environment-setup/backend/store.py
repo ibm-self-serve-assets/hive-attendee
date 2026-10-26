@@ -107,6 +107,14 @@ class DashboardStore:
         # Independent of the simulation run, so reset() leaves it alone.
         self.hive_inventory_balances_ready: bool = False
 
+        # Connection to the simulation server / Confluent, set by auto_connect:
+        #   'connecting' | 'connected' | 'failed'
+        # `connection_issues` holds plain-language problems (backend.connection_issues.Issue
+        # as dicts) to show the attendee; empty unless status is 'failed'.
+        # Independent of the simulation run, so reset() leaves it alone.
+        self.connection_status: str = "connecting"
+        self.connection_issues: List[Dict[str, Any]] = []
+
         # Dedup
         self._seen_ids: Dict[str, None] = {}
         self._seen_max = 5000
@@ -345,4 +353,6 @@ class DashboardStore:
             "event_topics_missing": list(self.event_topics_missing),
             "hive_job_durations_ready": self.hive_job_durations_ready,
             "hive_inventory_balances_ready": self.hive_inventory_balances_ready,
+            "connection_status": self.connection_status,
+            "connection_issues": [dict(i) for i in self.connection_issues],
         }

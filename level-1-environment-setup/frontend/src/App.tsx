@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { ConnectionIssues } from './components/ConnectionIssues';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { DEFAULT_LEVEL_ID, LEVELS } from './levels/registry';
@@ -13,10 +14,12 @@ function levelIdFromHash(): string {
 
 export const App: React.FC = () => {
   const [state, setState] = useState<DashboardState>(EMPTY_STATE);
-  const [connectError, setConnectError] = useState<string | null>(null);
   const [levelId, setLevelId] = useState(levelIdFromHash);
   const level = LEVELS.find((l) => l.id === levelId) ?? LEVELS[0];
   const { Screen, Requirements } = level;
+  // A failed connection is the real reason nothing works, so it takes over the main area
+  // (otherwise the attendee would see "Level 1 is locked" and look in the wrong place).
+  const connectionFailed = state.connection_status === 'failed' && state.connection_issues.length > 0;
   const isUnlocked = level.isUnlocked ? level.isUnlocked(state) : true;
   const isReady = isUnlocked && (level.isReady ? level.isReady(state) : true);
   const [isCommandPending, setIsCommandPending] = useState(false);
@@ -32,26 +35,6 @@ export const App: React.FC = () => {
     const onHashChange = () => setLevelId(levelIdFromHash());
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
-
-  // Check config on mount
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const cfgRes = await fetch('/api/config');
-        if (cfgRes.ok) {
-          const cfg = await cfgRes.json();
-          if (!cfg.fully_configured) {
-            setConnectError(
-              'Missing credentials in .env — check WORKSHOP_ACCESS_TOKEN, CONFLUENT_BOOTSTRAP_SERVER, CONFLUENT_API_KEY / SECRET.'
-            );
-          }
-        }
-      } catch (err) {
-        console.error('Init failed:', err);
-      }
-    };
-    init();
   }, []);
 
   // SSE stream
@@ -133,12 +116,6 @@ export const App: React.FC = () => {
       <div className="h-screen flex flex-col overflow-hidden" style={{ background: '#F4F7FC' }}>
         <Header />
 
-        {connectError && (
-          <div className="mx-6 mt-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded text-xs shrink-0">
-            {connectError}
-          </div>
-        )}
-
         <div className="flex-1 min-h-0 flex overflow-hidden">
           <Sidebar
             state={state}
@@ -149,7 +126,13 @@ export const App: React.FC = () => {
             isReady={isReady}
           />
           <main className="flex-1 min-h-0 overflow-auto">
-            {isUnlocked ? <Screen state={state} /> : Requirements ? <Requirements state={state} /> : null}
+            {connectionFailed ? (
+              <ConnectionIssues issues={state.connection_issues} />
+            ) : isUnlocked ? (
+              <Screen state={state} />
+            ) : Requirements ? (
+              <Requirements state={state} />
+            ) : null}
           </main>
         </div>
       </div>
