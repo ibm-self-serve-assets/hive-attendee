@@ -135,7 +135,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
               </div>
               <h2 className="text-xl font-bold text-[#031040] mb-2">Waiting for Flink…</h2>
               <p className="text-sm text-[#57606A] leading-relaxed">
-                The simulation is running. Waiting for the first job duration
+                The Simulation is running. Waiting for the first job duration
                 from the <code className="font-mono text-[#031040]">hive_job_durations</code> pipeline.
                 This can take up to a minute after the first job completes.
               </p>
@@ -143,7 +143,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
           ) : (
             <>
               <img src="/icons/svg/warning.svg" width={48} height={48} alt="" className="mx-auto mb-4 opacity-60" />
-              <h2 className="text-xl font-bold text-[#031040] mb-2">New simulation run required</h2>
+              <h2 className="text-xl font-bold text-[#031040] mb-2">New Simulation run required</h2>
               <p className="text-sm text-[#57606A] leading-relaxed">
                 Level 2 needs a fresh run so the Flink pipeline can calculate job
                 durations from the start. Click <strong>Restart</strong> in the sidebar to begin.

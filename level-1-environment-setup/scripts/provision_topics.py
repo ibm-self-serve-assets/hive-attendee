@@ -4,17 +4,17 @@ provision_topics.py
 ───────────────────
 Creates your Kafka topics before you register your simulation.  Uses the topics located in [spec-shared/schemas/event_payloads.json](../../spec-shared/schemas/event_payloads.json).
 
-The simulation server publishes events to these topics as your simulation runs.
+The Simulation server publishes events to these topics as your Simulation runs.
 Topics must exist before you call /v1/simulations — the server verifies them
 at registration time and will reject your request if any are missing.
 
 State topic (compact policy, infinite retention):
-simulation-state             — full simulation snapshot (lifecycle, inventory, stations)
+simulation-state             — full Simulation snapshot (lifecycle, inventory, stations)
 
 WHY COMPACT FOR FACTORY-STATE?
   Log compaction keeps only the most recent message per key. This means your
   local consumer can always replay from offset 0 and land on current state
-  in a single pass — no matter how long the simulation has been running.
+  in a single pass — no matter how long the Simulation has been running.
 
 IDEMPOTENT: running this script twice is safe. Existing topics are left
 unchanged and reported as "~ Exists" rather than causing an error.

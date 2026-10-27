@@ -1,7 +1,7 @@
 """
 Plain-language connection diagnostics for the attendee dashboard.
 
-Every problem found while connecting (bad .env values, a simulation server that
+Every problem found while connecting (bad .env values, a Simulation server that
 cannot be reached or rejects the credentials, a Confluent cluster that cannot be
 reached or signed in to) becomes an ``Issue``: a stable code, a short title
 and what went wrong. Issues are logged to the backend console in
@@ -98,7 +98,7 @@ def validate_config(config: BackendConfig) -> List[Issue]:
             code="token_missing",
             source=SOURCE_CONFIG,
             title="WORKSHOP_ACCESS_TOKEN has not been filled in",
-            message="The dashboard has no workshop access token, so the simulation server cannot identify you.",
+            message="The dashboard has no workshop access token, so the Simulation server cannot identify you.",
         ))
 
     # CONFLUENT_BOOTSTRAP_SERVER
@@ -161,7 +161,7 @@ def _bootstrap_format_problem(bootstrap: str) -> Optional[str]:
 # ── 2. Simulation server ──────────────────────────────────────────────────────
 
 def _server_error_fields(body: Any) -> "tuple[Optional[str], Optional[str]]":
-    """Pull (error_code, message) out of the simulation server's error body.
+    """Pull (error_code, message) out of the Simulation server's error body.
 
     The server wraps errors as {"detail": {"error_code", "message"}} (FastAPI HTTPException)
     or returns {"error_code", "message"} directly (JSONResponse). A plain-text body is
@@ -180,7 +180,7 @@ def _server_error_fields(body: Any) -> "tuple[Optional[str], Optional[str]]":
 
 def classify_http_error(config: BackendConfig, status_code: int, body: Any) -> Issue:
     """
-    Report an error response from the simulation server.
+    Report an error response from the Simulation server.
 
     The server's own message is shown as it is, so its wording is maintained in one
     place (the server). This only chooses a stable code.
@@ -205,13 +205,13 @@ def classify_http_error(config: BackendConfig, status_code: int, body: Any) -> I
     return Issue(
         code=issue_code,
         source=SOURCE_SIM_SERVER,
-        title=server_message or f"The simulation server at {config.simulation_server_url} answered with HTTP {status_code}",
+        title=server_message or f"The Simulation server at {config.simulation_server_url} answered with HTTP {status_code}",
         detail=None if structured else _trim(message),
     )
 
 
 def classify_network_error(config: BackendConfig, exc: BaseException) -> Issue:
-    """Explain a failure to talk to the simulation server at all."""
+    """Explain a failure to talk to the Simulation server at all."""
     url = config.simulation_server_url
     text = str(exc).lower()
     default_hint = (
@@ -233,7 +233,7 @@ def classify_network_error(config: BackendConfig, exc: BaseException) -> Issue:
         return Issue(
             code="sim_timeout",
             source=SOURCE_SIM_SERVER,
-            title="The simulation server did not respond in time",
+            title="The Simulation server did not respond in time",
             message=f"Waited for {url} but got no answer. The server may be starting up, busy, or blocked by your network.",
             detail=detail,
         )
@@ -244,7 +244,7 @@ def classify_network_error(config: BackendConfig, exc: BaseException) -> Issue:
             return Issue(
                 code="sim_host_not_found",
                 source=SOURCE_SIM_SERVER,
-                title="The simulation server address was not found",
+                title="The Simulation server address was not found",
                 message=f"No server exists at {url}; the host name could not be found.{default_hint}",
                 detail=detail,
             )
@@ -252,14 +252,14 @@ def classify_network_error(config: BackendConfig, exc: BaseException) -> Issue:
             return Issue(
                 code="sim_tls_failed",
                 source=SOURCE_SIM_SERVER,
-                title="Secure connection to the simulation server failed",
+                title="Secure connection to the Simulation server failed",
                 message=f"The dashboard could not set up a secure (HTTPS) connection to {url}.",
                 detail=detail,
             )
         return Issue(
             code="sim_unreachable",
             source=SOURCE_SIM_SERVER,
-            title="Could not connect to the simulation server",
+            title="Could not connect to the Simulation server",
             message=f"Nothing is accepting connections at {url}.{default_hint}",
             detail=detail,
         )
@@ -267,7 +267,7 @@ def classify_network_error(config: BackendConfig, exc: BaseException) -> Issue:
     return Issue(
         code="sim_connection_failed",
         source=SOURCE_SIM_SERVER,
-        title="Connecting to the simulation server failed",
+        title="Connecting to the Simulation server failed",
         message=f"An unexpected problem occurred while contacting {url}.",
         detail=detail,
     )
@@ -278,8 +278,8 @@ def not_a_simulation_server(config: BackendConfig) -> Issue:
     return Issue(
         code="sim_url_wrong_service",
         source=SOURCE_SIM_SERVER,
-        title="SIMULATION_SERVER_URL does not look like the simulation server",
-        message=f"{config.simulation_server_url} answered, but its reply was not what a Hive simulation server sends.",
+        title="SIMULATION_SERVER_URL does not look like the Simulation server",
+        message=f"{config.simulation_server_url} answered, but its reply was not what a Hive Simulation server sends.",
     )
 
 
@@ -287,30 +287,30 @@ def provisioning_timeout(config: BackendConfig, waited_seconds: int) -> Issue:
     return Issue(
         code="provisioning_timeout",
         source=SOURCE_SIM_SERVER,
-        title="Your simulation is taking too long to set up",
+        title="Your Simulation is taking too long to set up",
         message=(
-            f"The simulation server is still checking your Confluent cluster after {waited_seconds} seconds."
+            f"The Simulation server is still checking your Confluent cluster after {waited_seconds} seconds."
         ),
     )
 
 
 def from_server_diagnostic(diagnostic: Optional[Dict[str, Any]], fallback_detail: Optional[str] = None) -> Issue:
-    """Turn the simulation server's provisioning_error into an Issue."""
+    """Turn the Simulation server's provisioning_error into an Issue."""
     if isinstance(diagnostic, dict) and diagnostic.get("code"):
         return Issue(
             code=str(diagnostic["code"]),
             source=SOURCE_CONFLUENT,
-            title=str(diagnostic.get("title") or "Your simulation could not be set up"),
+            title=str(diagnostic.get("title") or "Your Simulation could not be set up"),
             message=str(diagnostic.get("message") or ""),
             detail=_trim(diagnostic.get("detail")),
         )
-    # Older simulation servers report failures without a structured diagnosis.
+    # Older Simulation servers report failures without a structured diagnosis.
     return Issue(
         code="provisioning_failed",
         source=SOURCE_CONFLUENT,
-        title="The simulation server could not verify your Confluent cluster",
+        title="The Simulation server could not verify your Confluent cluster",
         message=(
-            "The simulation server tried to connect to your Confluent Cloud cluster and write test events, "
+            "The Simulation server tried to connect to your Confluent Cloud cluster and write test events, "
             "but the check failed."
         ),
         detail=_trim(fallback_detail),

@@ -13,7 +13,7 @@ interface ConnectionIssuesProps {
 
 /**
  * Shown in the main area instead of the level screen when the backend could not connect
- * the dashboard to the simulation server or Confluent. Each issue says what went wrong.
+ * the dashboard to the Simulation server or Confluent. Each issue says what went wrong.
  * The backend only reads .env at startup, so after editing it the backend must be restarted.
  */
 export const ConnectionIssues: React.FC<ConnectionIssuesProps> = ({ issues }) => {

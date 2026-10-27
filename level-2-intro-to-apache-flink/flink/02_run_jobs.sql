@@ -27,7 +27,7 @@
 --      1 minute after the started event (Kafka record time). Jobs normally
 --      take 5-15 s, so this keeps Flink's memory small. A started event with no
 --      completed event in that window produces no row.
---      If you slow the simulation down so jobs take over a minute, widen the
+--      If you slow the Simulation down so jobs take over a minute, widen the
 --      "+ INTERVAL '1' MINUTE" bound.
 --
 -- WHAT THE OUTPUT NUMBERS MEAN

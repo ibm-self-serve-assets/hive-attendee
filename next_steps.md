@@ -8,11 +8,11 @@ Layout: both repos sit side by side in one working directory, `hive-workshop/`:
 
 ```
 hive-workshop/
-  hive-attendee/     this repo: dashboard, level docs, Flink SQL   -> next_steps.md
-  hive-simulation/   the simulation server                         -> hive-simulation/next_steps.md
+  hive-attendee/     this repo: dashboard, level docs, Apache Flink SQL   -> next_steps.md
+  hive-simulation/   the Simulation server                         -> hive-simulation/next_steps.md
 ```
 
-The simulation server's plan is in [`../hive-simulation/next_steps.md`](../hive-simulation/next_steps.md). Decisions that affect both repos are listed there under "v2: shared decisions" and are not repeated here, only referenced.
+The Simulation server's plan is in [`../hive-simulation/next_steps.md`](../hive-simulation/next_steps.md). Decisions that affect both repos are listed there under "v2: shared decisions" and are not repeated here, only referenced.
 
 ## Release plan
 
@@ -21,7 +21,7 @@ The simulation server's plan is in [`../hive-simulation/next_steps.md`](../hive-
 | **v1** | The current code in both repos, deployed as it stands. | **Frozen.** No feature work lands before v1 is deployed and tagged. Only fixes needed to ship (section "Before v1 ships"). |
 | **v2** | Everything else in this file: the Orders/Treasury rework, order events, Tableflow, later levels. | Starts after v1 is deployed. Work on a separate branch, so v1 can still take a hotfix. |
 
-Suggested tagging (you run git): tag `v1.0.0` in both repos at the commit that is deployed, then branch `v2` from it. Record which simulation server image the v1 dashboard was tested against, since the two are deployed separately.
+Suggested tagging (you run git): tag `v1.0.0` in both repos at the commit that is deployed, then branch `v2` from it. Record which Simulation server image the v1 dashboard was tested against, since the two are deployed separately.
 
 ## v1: state
 
@@ -35,22 +35,22 @@ Suggested tagging (you run git): tag `v1.0.0` in both repos at the commit that i
 Verification and configuration only. No new features.
 
 - [ ] **Decide whether Level 4 ships.** It is registered and unlocked by `hive_inventory_balances_ready`, but it is partly built and has no README (`level-4-gamify/` is empty). Either ship it as is and tell attendees it is a preview, or hide it for v1 by removing its entry from `LEVELS` in `levels/registry.ts`. That is a one-line change and a v1 call. Default if undecided: ship it unchanged.
-- [ ] **Point the dashboard backend at the deployed simulation server** (URL and auth) and update the Level 1 setup steps in `level-1-environment-setup/README.md`.
+- [ ] **Point the dashboard backend at the deployed Simulation server** (URL and auth) and update the Level 1 setup steps in `level-1-environment-setup/README.md`.
 - [ ] **Check the dashboard backend's long-lived connections** against the Cloud Run request timeout. A run lasts 2.8 to 5.6 real hours.
 - [ ] **Rehearse with 3 to 5 real attendee clusters** before the class. The v2 load test uses a mock Kafka and does not cover real Confluent behaviour.
 - [ ] Confirm `debug_mode_instructor_only` is `null` in any workshop run. `store.py` reads it to bypass Flink inventory; keep that path out of attendee docs, since the field is instructor-only.
 - [ ] Confirm the `*.acquired` events (`manufacturing.resources.acquired`, `assembly.parts.acquired`) are provisioned and deleted. `provision_topics.py` builds its topic list from `spec-shared/schemas/event_payloads.json`, so they should be covered with no script change. Verify with `python3 provision_topics.py --dry-run` and a look at `delete_topics.py`. `store.py` already accepts them with no state change.
 - [ ] Document the `*.acquired` events in the Level 1 docs (`README.md`, topic list) if they are missing.
-- [ ] Fix the leftover rename artifact "simulation simulation" in `Hive_Workshop_Overview.md` (it appears in several sentences, for example "manages the simulation simulation itself"; likely a global rename of "factory" to "simulation"). This is a text fix, safe for v1.
+- [ ] Fix the leftover rename artifact "simulation simulation" in `Hive_Workshop_Overview.md` (it appears in several sentences, for example "manages the Simulation simulation itself"; likely a global rename of "factory" to "simulation"). This is a text fix, safe for v1.
 - [ ] Repo hygiene: untrack `.DS_Store` if tracked. `.gitignore` already lists it.
 - [ ] Commit, push, tag `v1.0.0`, branch `v2`.
 
-## v2: blocked on the simulation side
+## v2: blocked on the Simulation side
 
 These need an answer from [`../hive-simulation/next_steps.md`](../hive-simulation/next_steps.md) first:
 
 - The **order model**, the **event names** (`order.placed` / `order.fulfilled`) and the **contract version**. The Level 4 Orders panel and Treasury both depend on them.
-- How `spec-shared/` is **shared between the repos**. This repo and `hive-simulation` each hold a copy; the two are identical today apart from a stray `.DS_Store` in the simulation copy. Any edit to `event_payloads.json` or `topics.py` has to land in both until this is decided.
+- How `spec-shared/` is **shared between the repos**. This repo and `hive-simulation` each hold a copy; the two are identical today apart from a stray `.DS_Store` in the Simulation copy. Any edit to `event_payloads.json` or `topics.py` has to land in both until this is decided.
 
 ## v2 work
 
@@ -84,7 +84,7 @@ The docs and the dashboard disagree:
 ### 4. Level documentation
 
 - [ ] Write the Level 4 (gamify) README for attendees. It must not reveal the simulation's hidden counters or internals.
-- [ ] Update `level-1-environment-setup/README.md` for the order topics and any change to how the dashboard finds the simulation server.
+- [ ] Update `level-1-environment-setup/README.md` for the order topics and any change to how the dashboard finds the Simulation server.
 - [ ] Remove stale references to `simulation-instructor-only/` and `backup_ui/` from docs once the layout is settled.
 
 ### 5. Tableflow runbook (Level 4 or 5, see numbering)
@@ -94,7 +94,7 @@ The docs and the dashboard disagree:
 ### 6. Later levels (from the overview)
 
 - [ ] Headless agentic harness with IBM Bob (planned Level 5).
-- [ ] Bob managing the simulation (planned Level 6). This needs the simulation's REST controls documented for an agent, which is a simulation-repo task.
+- [ ] Bob managing the Simulation (planned Level 6). This needs the simulation's REST controls documented for an agent, which is a simulation-repo task.
 
 ### 7. Cleanup
 
@@ -120,7 +120,7 @@ To add a level:
 
 - v1 is frozen once tagged. Fixes to a deployed v1 go on a hotfix branch, not on `v2`.
 - **Keep the levels current.** When the simulation, the attendee backend/frontend, or the Flink SQL changes, update the matching level `.md` files in the same change.
-- **Audience.** Levels 1 to 4 are written for attendees and do not reveal hidden simulation state.
+- **Audience.** Levels 1 to 4 are written for attendees and do not reveal hidden Simulation state.
 - **Hidden state stays out.** Do not add fields such as `staged_inputs` to the schema, the models, or the dashboard, and do not recompute carts in the dashboard backend.
 - **One source of truth.** Point to `simulation_rules.json` and `event_payloads.json` instead of copying values into docs.
 - **Attendee SQL** runs in the Confluent Flink workspace, one statement per run. Prefer a small number of files that each run once.
@@ -130,7 +130,7 @@ To add a level:
 ## Done (for reference)
 
 - Unified dashboard with a Levels dropdown, URL hash routing (`#level-1` to `#level-4`), and a screen per level.
-- Level 2: job durations, blocked state, input chips; `isUnlocked` gate on `hive_job_durations`; `isReady` gate ("New simulation run required" / "Waiting for Flink…"); FlowDots; Flink SQL verified in Confluent Cloud.
+- Level 2: job durations, blocked state, input chips; `isUnlocked` gate on `hive_job_durations`; `isReady` gate ("New Simulation run required" / "Waiting for Flink…"); FlowDots; Flink SQL verified in Confluent Cloud.
 - Level 3: ledger and balances; gate on `hive_inventory_balances`; Flink SQL (`01_create_sink.sql`, `02_run_jobs.sql`, `03_validate.sql`) and CLI-first README.
 - Event panels start collapsed in Levels 1 and 2.
 - Schema Registry 5-byte magic prefix stripped in both Flink topic consumers.

@@ -244,7 +244,7 @@ async def _auto_connect():
                         store.running = f0.get("running", store.running)
                         topics_map = f0.get("topics", {})
                         wait_for_ready = f0_status == "provisioning"
-                        logger.info(f"AUTO-CONNECT: Reconnected to simulation {f0['simulation_id'][:8]}…", extra=MAJOR)
+                        logger.info(f"AUTO-CONNECT: Reconnected to Simulation {f0['simulation_id'][:8]}…", extra=MAJOR)
 
             if not store.active_simulation_id:
                 logger.info("AUTO-CONNECT: Provisioning new simulation…", extra=MAJOR)
@@ -396,7 +396,7 @@ async def send_control(
             if not store.active_simulation_id:
                 raise HTTPException(status_code=500, detail={
                     "error_code": "provision_failed",
-                    "message": _connect_failure_message("Failed to re-sync simulation after server reload/restart"),
+                    "message": _connect_failure_message("Failed to re-sync Simulation after server reload/restart"),
                 })
             target_cmd = "start" if (req.command == "restart" and req.start is not False) or req.command == "start" else req.command
             return await _send_server_command(target_cmd)

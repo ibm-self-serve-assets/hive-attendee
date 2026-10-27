@@ -2,12 +2,11 @@
 
 ## Overview & Goal
 
-In Level 2 you used Confluent Cloud UI to build a job-duration pipeline that tells you _how long_ each simulation job took.  
-Level 3 adds **live inventory**: how many resources, parts, and robots are in stock at this moment.
+In Level 2, you used Confluent Cloud's UI to execute SQL commands in Apache Flink that calcuated that `job-duration` for each Station in your manufacturing Simulation.  In Level 3, you will use the **Confluent CLI** to calculate teh **Live Inventory** for your Simulation: how many resources, parts, and robots are in stock or surplus.
 
-**The Problem:** Raw events only record what was produced or consumed at a single instant.  There is no event that says "there are currently 7 units of copper in stock."
+**The Problem:** Raw Simulation events record only what was produced or consumed at a single instant.  There is no event that says "there are currently 7 units of copper in inventory."
 
-**Your Objective:** Use Apache Flink stateful aggregations to maintain a continuously updated inventory balance for every item in the simulation:
+**Your Objective:** Use Apache Flink stateful aggregations to maintain a continuously updated inventory balance for every item in the Simulation:
 
 - **Resources** arrive via `gathering.completed` and are consumed when manufacturing stations start jobs (`manufacturing.started` inputs).
 - **Parts** arrive via `manufacturing.completed` and are consumed when assembly starts (`assembly.started` inputs).
@@ -32,7 +31,7 @@ assembly-completed ────────────► Flink stateful SUM �
 ## Prerequisites
 
 - Level 2 is complete: `hive_job_durations` exists and the stream processing statement is **Running**.
-- The simulation simulation is running and events are flowing.
+- The Simulation simulation is running and events are flowing.
 - The Confluent CLI is installed (instructions below).
 
 ---
@@ -165,7 +164,7 @@ confluent flink statement describe hive-inventory-jobs -o json | grep -E '"(stat
 
 ## Step 5 — Validate
 
-The jobs from Step 4 are running, but nothing so far has shown you their output. In this step you read the `hive_inventory_balances` table to confirm that Flink is keeping a current stock count for every resource, part, and robot. The simulation should be running so that you can see the numbers change.
+The jobs from Step 4 are running, but nothing so far has shown you their output. In this step you read the `hive_inventory_balances` table to confirm that Flink is keeping a current stock count for every resource, part, and robot. The Simulation should be running so that you can see the numbers change.
 
 **1. Open the Flink shell.** This is an interactive window where you type SQL and see the results.
 ```bash
@@ -178,20 +177,20 @@ A `>` prompt appears when the shell is ready.
 
 **2. Copy the query from `flink/03_validate.sql`, paste it at the `>` prompt and press Enter.** It reads the table the jobs write to.
 
-**3. Read the result.** A table of results opens and updates by itself while the simulation runs. It is not sorted, because Flink cannot sort a live stream. 
+**3. Read the result.** A table of results opens and updates by itself while the Simulation runs. It is not sorted, because Flink cannot sort a live stream. 
 
 <img src="assets/screenshots/inventory_in_confluent_shell.png" width="75%" />
 
 You should see:
 - one row for each of the 5 resources, 4 parts and 2 robots for the current run (11 rows);
-- quantities that change as the simulation runs;
+- quantities that change as the Simulation runs;
 - no negative numbers.
 
 If you restarted the simulation, the table also keeps rows from earlier runs. Each run has its own `run_id`.
 
 **4. Close the results and the shell.** Press `Q` to close the results. Then type `EXIT;` or press `Ctrl+D` to close the shell.
 
-If you see rows with changing quantities, Level 3 is working. Open **Level 3** in the dashboard to see the same numbers on the simulation floor.
+If you see rows with changing quantities, Level 3 is working. Open **Level 3** in the dashboard to see the same numbers on the Simulation floor.
 
 > **Gate Check:** The dashboard Level 3 view unlocks once the `hive_inventory_balances` topic exists. Running `01_create_sink.sql` (Step 3) creates it.
 
@@ -266,7 +265,7 @@ Stream Lineage is built into Stream Governance (Essentials) and automatically tr
 
 ### What to Explore in Level 3
 
-- **Upstream Source Topics:** Trace events originating from the simulation across raw topics such as `gathering-completed`, `manufacturing-started`, `manufacturing-completed`, `assembly-started`, and `assembly-completed`.
+- **Upstream Source Topics:** Trace events originating from the Simulation across raw topics such as `gathering-completed`, `manufacturing-started`, `manufacturing-completed`, `assembly-started`, and `assembly-completed`.
 - **Flink Processing Statement:** Identify the Flink job node representing your running `hive-inventory-jobs` statement set (as well as Level 2's `hive_job_durations` joins).
 - **Derived Sink Topic:** Observe the flow routing into the `hive_inventory_balances` topic (the upsert changelog table).
 - **Downstream Consumers:** Locate the consumer application nodes representing your local Hive Dashboard backend service reading the live inventory balances and raw events.

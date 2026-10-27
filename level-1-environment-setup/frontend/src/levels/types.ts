@@ -15,7 +15,7 @@ export interface LevelDefinition {
   Screen: React.FC<LevelScreenProps>;
   /**
    * Optional gate. While `isUnlocked(state)` is false the main area shows `Requirements`
-   * instead of `Screen`, and the sidebar hides the simulation controls and time.
+   * instead of `Screen`, and the sidebar hides the Simulation controls and time.
    * Omit for ungated levels.
    */
   isUnlocked?: (state: DashboardState) => boolean;
@@ -23,7 +23,7 @@ export interface LevelDefinition {
   /**
    * Optional readiness check. The level is unlocked (topic exists) but the current
    * sim run does not yet have data for it. While `isReady(state)` is false the sidebar
-   * hides simulation controls and sim time (same as locked), but the main area shows
+   * hides Simulation controls and sim time (same as locked), but the main area shows
    * the Screen — which is responsible for rendering its own "restart required" prompt.
    * Omit when no per-run readiness check is needed.
    */

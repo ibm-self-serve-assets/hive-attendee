@@ -22,7 +22,7 @@ except ImportError:
 
 class EventConsumerManager:
     """
-    Consumes simulation events from Confluent Cloud and feeds the dashboard store.
+    Consumes Simulation events from Confluent Cloud and feeds the dashboard store.
     Identical transport to spec-3; only the store differs.
     """
 

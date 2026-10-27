@@ -37,8 +37,8 @@
 -- =============================================================================
 
 CREATE TABLE `hive_inventory_balances` (
-  `simulation_id`  STRING,          -- simulation this balance belongs to
-  `run_id`      STRING,          -- simulation run; resets when the simulation restarts
+  `simulation_id`  STRING,          -- Simulation this balance belongs to
+  `run_id`      STRING,          -- Simulation run; resets when the Simulation restarts
   `item_type`   STRING,          -- 'resource' | 'part' | 'robot'
   `item_id`     STRING,          -- e.g. 'copper', 'chassis', 'engineer'
   `quantity`    BIGINT,          -- current net stock (always >= 0 in a healthy sim)

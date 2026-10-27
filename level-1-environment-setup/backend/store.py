@@ -3,7 +3,7 @@ In-memory store for the basic connect-simulation dashboard.
 
 Tracks only what the design comp needs:
   - sim_time_minutes    from any event envelope
-  - simulation lifecycle    from simulation.state
+  - Simulation lifecycle    from simulation.state
   - completed counts     from *.completed event payloads
   - in-progress flags    from *.started / *.completed pairing
   - blocked state        from *.blocked event payloads
@@ -100,18 +100,18 @@ class DashboardStore:
         self.event_topics_missing: List[str] = []
 
         # Level 2 gate: the hive_job_durations topic exists (created by the attendee's Flink SQL).
-        # Independent of the simulation run, so reset() leaves it alone.
+        # Independent of the Simulation run, so reset() leaves it alone.
         self.hive_job_durations_ready: bool = False
 
         # Level 3 gate: the hive_inventory_balances topic exists.
-        # Independent of the simulation run, so reset() leaves it alone.
+        # Independent of the Simulation run, so reset() leaves it alone.
         self.hive_inventory_balances_ready: bool = False
 
-        # Connection to the simulation server / Confluent, set by auto_connect:
+        # Connection to the Simulation server / Confluent, set by auto_connect:
         #   'connecting' | 'connected' | 'failed'
         # `connection_issues` holds plain-language problems (backend.connection_issues.Issue
         # as dicts) to show the attendee; empty unless status is 'failed'.
-        # Independent of the simulation run, so reset() leaves it alone.
+        # Independent of the Simulation run, so reset() leaves it alone.
         self.connection_status: str = "connecting"
         self.connection_issues: List[Dict[str, Any]] = []
 

@@ -18,7 +18,7 @@
 --
 -- BEFORE YOU RUN
 --   * Step 1 (01_create_sink.sql) has completed successfully.
---   * The simulation simulation is running and events are flowing.
+--   * The Simulation simulation is running and events are flowing.
 --   * Same CLI context as Step 1 (environment, cluster, compute pool).
 --
 -- HOW INPUTS ARE EXTRACTED

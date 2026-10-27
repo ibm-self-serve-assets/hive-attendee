@@ -2,7 +2,7 @@
 
 ## Overview & Goal
 
-In the Hive workshop, your simulation emits discrete lifecycle events across different Kafka topics as resources are collected, parts are manufactured and robots are assembled. 
+In the Hive workshop, your Simulation emits discrete lifecycle events across different Kafka topics as resources are collected, parts are manufactured and robots are assembled. 
 
 However, raw events tell you only what happened at an instant in time:
 - A `*.started` event announces that a job began.
@@ -30,7 +30,7 @@ However, raw events tell you only what happened at an instant in time:
 ## What You Are Building
 
 ### 1. Input Streams
-Your simulation publishes raw JSON events across three production stages (defined in [`spec-shared/schemas/event_payloads.json`](../spec-shared/schemas/event_payloads.json)):
+Your Simulation publishes raw JSON events across three production stages (defined in [`spec-shared/schemas/event_payloads.json`](../spec-shared/schemas/event_payloads.json)):
 
 | Production Stage | Started Topic | Completed Topic | What It Represents |
 |---|---|---|---|
@@ -48,7 +48,7 @@ Flink will create a Kafka topic named `hive_job_durations` and publish a unified
 | `job_id` | Shared `payload.job_id` | Correlates both events together |
 | `stage` | `gathering`, `manufacturing`, or `assembly` | Allows cross-stage filtering and grouping |
 | `output_type` | `station_id` | Identifies which station or item type was worked on |
-| `elapsed_sim_minutes` | `completed.sim_time_minutes - started.sim_time_minutes` | **Exact simulated duration.** Independent of clock drift or simulation speed. |
+| `elapsed_sim_minutes` | `completed.sim_time_minutes - started.sim_time_minutes` | **Exact simulated duration.** Independent of clock drift or Simulation speed. |
 | `elapsed_wall_s` | Difference between `occurred_at` timestamps | **Real-world duration in seconds.** Measures real wall-clock latency. |
 
 ---
@@ -122,8 +122,8 @@ You will first configure your environment and run the pipeline using the **Confl
 
 #### A. Ensure Simulation Data is Flowing
 Before proceeding, ensure your Simulation Dashboard is:
-- Connected to the Hive simulation server and running.
-- The simulation timer is incrementing up.
+- Connected to the Hive Simulation server and running.
+- The Simulation timer is incrementing up.
 - This ensures Kafka events are being actively published to `gathering-*`, `manufacturing-*`, and `assembly-*` topics.
 
 <img src="screenshots/screenshot-12.png" width="35%" />
@@ -151,7 +151,7 @@ Before proceeding, ensure your Simulation Dashboard is:
 2. Copy the entire SQL statement, paste into the **second workspace cell** and click **Run**.
   - **What this does:** Submits three continuous streaming jobs (gathering, manufacturing, assembly) bundled into a single Flink statement. Flink continuously joins incoming `started` and `completed` events and writes the correlated duration records into `hive_job_durations`.
   - **Expected status:** **Running**. Unlike the earlier DDL commands creating the Sink table, stream processing queries are continuous, long-running background jobs that stay active on your compute pool, listening for incoming Kafka events and calculating durations in real time.
-  - Ignore the warning.  This is because the simulation event producer is not using the Confluent's Schema Registry to keep this workshop simple to start.
+  - Ignore the warning.  This is because the Simulation event producer is not using the Confluent's Schema Registry to keep this workshop simple to start.
 3. So do **NOT** click **Stop**.  Clicking the **Stop** button cancels and terminates your background Flink streaming pipeline.
   - After the next step, you will close this SQL Workspace while leaving this stream processing queries running in the background.
 
@@ -198,7 +198,7 @@ To inspect and verify your active streaming statement running on your compute po
 
 - **Statement CFU:** Shows Confluent Flink Units allocated to this pipeline.
 - **Messages behind (Lag):** Confirms Flink is processing in real time with near-zero lag.
-- **Messages in/out per minute:** Visualizes incoming simulation events and derived duration records being produced.
+- **Messages in/out per minute:** Visualizes incoming Simulation events and derived duration records being produced.
 
 ### Step 3: Level 2 Dashboard Unlocked !!
 

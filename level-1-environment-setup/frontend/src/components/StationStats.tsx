@@ -7,7 +7,7 @@ import React from 'react';
  * ring stays readable), drawn as a progress bar: while `spinning` a segment turns
  * solid every `duration / n` seconds, clockwise from 12 o'clock, and stays solid
  * until the ring is full, then the ring resets.  1 real second = 1 sim minute, so
- * one lap takes "n mins" seconds.  Pausing the simulation freezes the ring.
+ * one lap takes "n mins" seconds.  Pausing the Simulation freezes the ring.
  * The completed count and "n mins" are drawn inside the ring.
  */
 export const SegmentRingLegacy: React.FC<{

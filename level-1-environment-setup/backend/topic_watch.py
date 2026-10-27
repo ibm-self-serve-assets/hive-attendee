@@ -34,7 +34,7 @@ def load_event_topic_names() -> List[str]:
 
 class EventTopicsWatcher:
     """
-    Polls Confluent Cloud for the simulation event topics defined in event_payloads.json
+    Polls Confluent Cloud for the Simulation event topics defined in event_payloads.json
     (created by Level 1's provision_topics.sh) and keeps `store.event_topics_ready` /
     `store.event_topics_missing` current. Only checks that topics exist; it never reads records.
     """

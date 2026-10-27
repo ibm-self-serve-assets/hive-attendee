@@ -20,7 +20,7 @@ export type EventSection = 'gathering' | 'manufacturing' | 'assembly';
 /** A plain-language connection problem reported by the backend (backend/connection_issues.py). */
 export interface ConnectionIssue {
   code: string;
-  /** Where the problem is: the local .env ('config'), the simulation server, or Confluent. */
+  /** Where the problem is: the local .env ('config'), the Simulation server, or Confluent. */
   source: 'config' | 'simulation_server' | 'confluent';
   title: string;
   /** What went wrong. */
@@ -85,7 +85,7 @@ export interface DashboardState {
   // True once the hive_inventory_balances topic exists (created by the attendee's Flink SQL) (unlocks Level 3)
   hive_inventory_balances_ready: boolean;
 
-  // Whether the backend has connected your dashboard to the simulation server and Confluent.
+  // Whether the backend has connected your dashboard to the Simulation server and Confluent.
   connection_status: 'connecting' | 'connected' | 'failed';
   // Why the connection failed; empty unless connection_status is 'failed'.
   connection_issues: ConnectionIssue[];
