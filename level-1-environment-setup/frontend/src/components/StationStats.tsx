@@ -1,90 +1,5 @@
 import React from 'react';
 
-// ── Legacy segment-ring (kept as backup) ──────────────────────────────────────
-// TODO: delete SegmentRingLegacy if DotSpinner is confirmed (see next_steps.md)
-/**
- * Ring of arc segments, one per minute of the job duration (capped at 60 so the
- * ring stays readable), drawn as a progress bar: while `spinning` a segment turns
- * solid every `duration / n` seconds, clockwise from 12 o'clock, and stays solid
- * until the ring is full, then the ring resets.  1 real second = 1 sim minute, so
- * one lap takes "n mins" seconds.  Pausing the Simulation freezes the ring.
- * The completed count and "n mins" are drawn inside the ring.
- */
-export const SegmentRingLegacy: React.FC<{
-  segments: number;
-  size: number;
-  spinning: boolean;
-  count: number;
-  showCount?: boolean;
-  centerContent?: React.ReactNode;
-}> = ({ segments, size, spinning, count, showCount = true, centerContent }) => {
-  const lapMs = Math.max(1, segments) * 1000;
-  const [elapsedMs, setElapsedMs] = React.useState(0);
-
-  React.useEffect(() => {
-    if (!spinning) return;
-    let last = performance.now();
-    const id = window.setInterval(() => {
-      const now = performance.now();
-      setElapsedMs((e) => (e + (now - last)) % lapMs);
-      last = now;
-    }, 100);
-    return () => window.clearInterval(id);
-  }, [spinning, lapMs]);
-
-  const n = Math.min(Math.max(1, Math.round(segments)), 60);
-  const stroke = Math.max(3, size * 0.075);
-  const c = size / 2;
-  const r = c - stroke;
-  const step = 360 / n;
-  const gap = n === 1 ? 0 : Math.min(16, step * 0.35);
-  const lit = Math.min(n, Math.floor((elapsedMs / lapMs) * n) + 1);
-  const point = (deg: number) => {
-    const rad = (deg * Math.PI) / 180;
-    return [c + r * Math.sin(rad), c - r * Math.cos(rad)];
-  };
-
-  const arcs = Array.from({ length: n }, (_, i) => {
-    const [x0, y0] = point(i * step + gap / 2);
-    const [x1, y1] = point((i + 1) * step - gap / 2);
-    return { d: `M ${x0} ${y0} A ${r} ${r} 0 0 1 ${x1} ${y1}` };
-  });
-
-  return (
-    <div className="relative inline-block select-none flex-none" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
-        {n === 1 ? (
-          <circle cx={c} cy={c} r={r} fill="none" strokeWidth={stroke} stroke="#DCE6FA" />
-        ) : (
-          arcs.map(({ d }, i) => (
-            <path key={`t${i}`} d={d} fill="none" strokeWidth={stroke} strokeLinecap="butt" stroke="#DCE6FA" />
-          ))
-        )}
-        {elapsedMs > 0 &&
-          (n === 1 ? (
-            <circle cx={c} cy={c} r={r} fill="none" strokeWidth={stroke} stroke="#2850B8" />
-          ) : (
-            arcs.slice(0, lit).map(({ d }, i) => (
-              <path key={`s${i}`} d={d} fill="none" strokeWidth={stroke} strokeLinecap="butt" stroke="#2850B8" />
-            ))
-          ))}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center leading-none" style={{ pointerEvents: centerContent ? 'auto' : 'none' }}>
-        {showCount && (
-          <span className="font-bold font-mono text-[#031040] tabular-nums" style={{ fontSize: Math.round(size * 0.27) }}>
-            {count}
-          </span>
-        )}
-        {centerContent ?? (
-          <span className="font-semibold text-[#57606A]" style={{ fontSize: Math.max(9, Math.round(size * 0.14)), marginTop: showCount ? 4 : 0 }}>
-            {segments} mins
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // ── New dot-spinner ───────────────────────────────────────────────────────────
 /**
  * 8-dot classic loading spinner.
@@ -152,7 +67,7 @@ const COUNT_SCALE = 0.27;
 // ── SegmentRing: now delegates to DotSpinner ──────────────────────────────────
 /**
  * Public API unchanged — callers pass the same props.
- * Internally renders DotSpinner instead of SegmentRingLegacy.
+ * Internally renders DotSpinner.
  * The "n mins" label or custom centerContent is shown in the centre.
  */
 export const SegmentRing: React.FC<{
