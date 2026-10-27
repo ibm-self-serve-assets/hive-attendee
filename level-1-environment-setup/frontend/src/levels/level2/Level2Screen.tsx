@@ -165,7 +165,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
             style={{ minHeight: 604 }}
           >
-            <h2 className="text-[#2850B8] font-bold text-base mb-4">Resources Gathered</h2>
+            <h2 className="text-[#2850B8] font-bold text-base mb-4">Gather resources</h2>
             <div className="grid grid-cols-2 gap-3">
               {RESOURCES.map(({ id, label, icon }) => {
                 const count   = gathering_completed[id] ?? 0;
@@ -208,7 +208,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
             style={{ minHeight: 604 }}
           >
-            <h2 className="text-[#2850B8] font-bold text-base mb-4">Parts Manufactured</h2>
+            <h2 className="text-[#2850B8] font-bold text-base mb-4">Manufacture parts</h2>
             <div className="flex flex-col gap-3">
               {STATIONS.map(({ id, label, icon, output_type }) => {
                 const count   = manufacturing_completed[id] ?? 0;
@@ -240,7 +240,6 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       running={running}
                       tooltip="Waiting for resources"
                       ringSize={85}
-                      align="end"
                       countScale={0.19}
                     />
                   </div>
@@ -259,7 +258,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
             style={{ minHeight: 604 }}
           >
-            <h2 className="text-[#2850B8] font-bold text-base mb-4">Robots Assembled</h2>
+            <h2 className="text-[#2850B8] font-bold text-base mb-4">Assemble robots</h2>
             <div className="flex flex-col gap-3">
               {ROBOTS.map(({ id, station_id, label, icon }) => {
                 const count   = assembly_completed[id] ?? 0;
@@ -290,8 +289,6 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         running={running}
                         tooltip="Waiting for parts"
                         ringSize={90}
-                        countClass="text-3xl"
-                        align="end"
                         countScale={0.19}
                       />
                     </div>

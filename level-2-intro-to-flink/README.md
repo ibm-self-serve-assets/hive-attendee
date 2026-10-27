@@ -220,6 +220,14 @@ Your dashboard is still missing critical datapoints required to optimize your ma
 
 The total # of gathered resources and manufactured parts are visible.  However Resources have been acquired to produce Parts and Parts have been acquired to assemble Robots.  With your current events, you can't determine which Resources and Parts are over-supplied and which are bottlenecks.  So upir can't yet determine  which stations to upgrade first.
 
+#### Prioritizing Parts Manufacturing for Robot Assembly
+
+If you run the Simulation for 3 hours and 14 mins (3 mins and 14 seconds in real time), you'll observe Metals quickly becomes the bottleneck in production. All parts are manufactured at the rate of 1 item every 10 seconds.  Actuator fabrication and battery assembly are blocked most while waiting for scarce Metals. Electronics assembly is the fastest because electronics competes for the few rare resources.  
+
+If you run the Simulation longer, you will observe that actuators are the limiting input to robot assembly, with 8 actuators required per robot.  This means robot assembly is blocked most often because too few Metals are being produced.
+
+<img src="screenshots/robot_assembly_blocked.png"/>
+
 #### Orders and Treasury
 
 If you were really paying attention, you would have noticed events related to **Orders** and **Treasury**.  After all, why are you manufacturing robots unless someone placed an order for them.  And while it might be nice to give robots away for free, your manufacturing workflow is generating revenue that is tracked in your Treasury.  But more about that in a later level.

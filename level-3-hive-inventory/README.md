@@ -2,7 +2,7 @@
 
 ## Overview & Goal
 
-In Level 2 you used the Confluent Cloud UI to build a job-duration pipeline that tells you _how long_ each simulation job took.  
+In Level 2 you used Confluent Cloud UI to build a job-duration pipeline that tells you _how long_ each simulation job took.  
 Level 3 adds **live inventory**: how many resources, parts, and robots are in stock at this moment.
 
 **The Problem:** Raw events only record what was produced or consumed at a single instant.  There is no event that says "there are currently 7 units of copper in stock."
@@ -18,7 +18,7 @@ gathering-completed  ──┐
                         ├──► Flink stateful SUM  ───►  hive_inventory_balances
 manufacturing-started ──┘        (per item_id)          (upsert changelog)
 
-manufacturing-completed ──┐
+manufacturing-completed ──┐ 
                            ├──► Flink stateful SUM ───►  hive_inventory_balances
 assembly-started ──────────┘
 

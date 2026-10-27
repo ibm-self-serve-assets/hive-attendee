@@ -183,7 +183,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         <img src={icon} width={55} height={55} alt={output_type}
                           style={{ objectFit: 'contain' }} />
                         <StationStats count={count} blocked={blocked} durationMins={dur} running={running}
-                          tooltip="Waiting for resources" ringSize={85} align="end" showCount={false} />
+                          tooltip="Waiting for resources" ringSize={85} showCount={false} />
                       </div>
                     </div>
                   );
@@ -229,7 +229,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         <img src={icon} width={60} height={60} alt={label}
                           style={{ objectFit: 'contain' }} />
                         <StationStats count={count} blocked={blocked} durationMins={dur} running={running}
-                          tooltip="Waiting for parts" ringSize={90} countClass="text-3xl" align="end" showCount={false} />
+                          tooltip="Waiting for parts" ringSize={90} showCount={false} />
                       </div>
                     </div>
                   );

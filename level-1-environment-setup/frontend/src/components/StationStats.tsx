@@ -147,6 +147,8 @@ export const DotSpinner: React.FC<{
   );
 };
 
+const COUNT_SCALE = 0.27;
+
 // ── SegmentRing: now delegates to DotSpinner ──────────────────────────────────
 /**
  * Public API unchanged — callers pass the same props.
@@ -161,7 +163,7 @@ export const SegmentRing: React.FC<{
   showCount?: boolean;
   centerContent?: React.ReactNode;
   countScale?: number;
-}> = ({ segments, size, spinning, count, showCount = true, centerContent, countScale = 0.27 }) => {
+}> = ({ segments, size, spinning, count, showCount = true, centerContent, countScale = COUNT_SCALE }) => {
   const inner = centerContent ?? (
     <span className="font-semibold text-[#57606A]"
       style={{ fontSize: Math.max(9, Math.round(size * 0.14)), marginTop: showCount ? 4 : 0 }}>
@@ -187,10 +189,11 @@ export const SegmentRing: React.FC<{
 };
 
 /**
- * Per-station figure.
- *  - Blocked: warning icon (and optional count).
- *  - Duration known: DotSpinner (via SegmentRing).
- *  - Duration not yet known: count with "? mins" below it.
+ * Per-station figure, always `ringSize` square so every state lines up.
+ *  - Duration known and not blocked: DotSpinner (via SegmentRing).
+ *  - Blocked: the count with a warning icon where "n mins" would be.
+ *  - Duration not yet known: the count with "? mins" below it.
+ * The count and label use the same fonts as inside the ring.
  */
 export const StationStats: React.FC<{
   count: number;
@@ -199,34 +202,43 @@ export const StationStats: React.FC<{
   running: boolean;
   tooltip?: string;
   ringSize?: number;
-  countClass?: string;
-  align?: 'start' | 'end';
   showCount?: boolean;
   centerContent?: React.ReactNode;
   countScale?: number;
-}> = ({ count, blocked, durationMins, running, tooltip, ringSize = 72, countClass = 'text-2xl', align = 'start', showCount = true, centerContent, countScale }) => {
+}> = ({ count, blocked, durationMins, running, tooltip, ringSize = 72, showCount = true, centerContent, countScale = COUNT_SCALE }) => {
   if (!blocked && durationMins != null) {
     return <SegmentRing segments={durationMins} size={ringSize} spinning={running} count={count} showCount={showCount} centerContent={centerContent} countScale={countScale} />;
   }
 
+  // The label slot is as tall as the "n mins" label, so the count sits exactly where it
+  // does in the ring; the warning icon is centred in that slot and may overflow it.
+  const labelSize = Math.max(9, Math.round(ringSize * 0.14));
+  const iconSize = showCount ? 20 : 30;
+
   return (
-    <div className={`flex flex-col ${align === 'end' ? 'items-end' : 'items-start'}`}>
+    <div
+      className="flex flex-col items-center justify-center leading-none select-none flex-none"
+      style={{ width: ringSize, height: ringSize }}
+    >
       {showCount && (
-        <span className={`${countClass} font-bold font-mono text-[#031040] tabular-nums`}>{count}</span>
+        <span className="font-bold font-mono text-[#031040] tabular-nums" style={{ fontSize: Math.round(ringSize * countScale) }}>
+          {count}
+        </span>
       )}
-      {blocked ? (
-        <img
-          src="/icons/svg/warning.svg"
-          width={30}
-          height={30}
-          alt="blocked"
-          title={tooltip}
-          className="mt-0.5"
-          style={{ objectFit: 'contain', cursor: 'help' }}
-        />
-      ) : (
-        <span className="text-xs font-semibold text-[#57606A] mt-0.5">? mins</span>
-      )}
+      <div className="flex items-center justify-center" style={{ height: labelSize, marginTop: showCount ? 4 : 0 }}>
+        {blocked ? (
+          <img
+            src="/icons/svg/warning.svg"
+            width={iconSize}
+            height={iconSize}
+            alt="blocked"
+            title={tooltip}
+            style={{ objectFit: 'contain', cursor: 'help', flex: 'none' }}
+          />
+        ) : (
+          <span className="font-semibold text-[#57606A]" style={{ fontSize: labelSize }}>? mins</span>
+        )}
+      </div>
     </div>
   );
 };
