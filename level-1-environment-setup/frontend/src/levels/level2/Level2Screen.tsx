@@ -225,7 +225,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
                     key={id}
                     className="flex items-center justify-between gap-4 rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] px-4 py-3.5"
                   >
-                    {/* Part icon + station label with input chips below */}
+                    {/* Part icon + workstation label with input chips below */}
                     <div className="flex items-center gap-3 min-w-0">
                       <img src={icon} width={60} height={60} alt={output_type} style={{ objectFit: 'contain' }} />
                       <div className="flex flex-col gap-1">

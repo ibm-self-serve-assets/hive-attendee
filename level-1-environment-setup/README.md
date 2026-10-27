@@ -57,13 +57,13 @@ Your Hive dashboard connects to two services:
 ## How the Hive Simulation works
 **Key concepts**: simulation, event stream, sim-time
 
-When running, your Simulation will generates a stream of events each second where **1 second real time = 1 minute of Simulation time**, with a max duration of **1 simulated week = 2 hours 48 minutes in actual time**.  Each event provides information about how each station in your robotics manufacturing Simulation is behaving.  The robotics manufacturing stations are grouped into three categories:
+When running, your Simulation will generates a stream of events each second where **1 second real time = 1 minute of Simulation time**, with a max duration of **1 simulated week = 2 hours 48 minutes in actual time**.  Each event provides information about how each workstation in your robotics manufacturing Simulation is behaving.  The robotics manufacturing stations are grouped into three categories:
 
 1. Gather resources
 2. Manufacture parts 
 3. Assemble robots
 
-The Simulation starts in **Gather resources** where independent stations gather each resource.  As you explore the Simulation's event stream, you will learn that each station gathers its resources at different rates.  And in later Levels of the workshop, you will learn that each station is available in three different Tiers that determine its speed of resource gathering.  
+The Simulation starts in **Gather resources** where independent stations gather each resource.  As you explore the Simulation's event stream, you will learn that each workstation gathers its resources at different rates.  And in later Levels of the workshop, you will learn that each workstation is available in three different Tiers that determine its speed of resource gathering.  
 
 1. Copper
 2. Energy
@@ -73,14 +73,14 @@ The Simulation starts in **Gather resources** where independent stations gather 
 
 <img src="screenshots/hive_simulation_dashboard.png" />
 
-Each station in the **Manufacture parts** section provides the various parts required to assemble a robot:
+Each workstation in the **Manufacture parts** section provides the various parts required to assemble a robot:
 
 1. Actuator
 2. Battery
 3. Chassis
 4. Electronics
 
-And each station requires its own unique input of resources to generate a part.  In a later section, you will inspect the event within the Manufacturing stations to understand how many of each resource is typically required to manufacture that part.  For instance, the resources for **Actuator Fabrication** might be similar to
+And each workstation requires its own unique input of resources to generate a part.  In a later section, you will inspect the event within the Manufacturing stations to understand how many of each resource is typically required to manufacture that part.  For instance, the resources for **Actuator Fabrication** might be similar to
 
 - 1 Actuator  = 1 x energy + 2 metals + 1 copper
 
@@ -112,9 +112,13 @@ Skip this step if you already have a `hive_dev` environment with a Kafka cluster
 4. Under **Stream Governance package**, leave **Essentials** selected (starts at Free). This turns on **Schema Registry**, which Level 2 and Level 3 need.
 5. Click **Create**.
 
-   <img src="screenshots/confluent_create_environment.png" alt="Confluent Cloud: Create environment dialog with Essentials selected"/>
+<img src="screenshots/confluent_create_environment.png" />
 
-6. Create a Kafka cluster in the `hive_dev` environment: **Basic** or **Standard**, on **Google Cloud** in a US region (for example `us-west1`). Note the region, because the Apache Flink compute pool you create in Level 2 must use the same one.
+6. Create a Kafka cluster named `hive_cluster`. Select **Basic** on the far-right as this is the least expensive option. 
+7. Scroll down then select **Google Cloud** and region `Oregon (us-west1)`.
+8. Click **Launch cluster**.
+
+<img src="screenshots/confluent_create_cluster.png" />
 
 ---
 
@@ -164,7 +168,7 @@ The backend and topic provisioning scripts read configuration from `spec-shared/
 
 <img src="screenshots/user_account.png"/>
 
-7. Enter **Name** as `hive_workshop`, skip **Description**, open the **Select key scope** dropdown and choose `Kafka cluster`, choose **Environments** as `hive_dev` and **Cluster** as `hive_cluster_1`
+7. Enter **Name** as `hive_workshop`, skip **Description**, open the **Select key scope** dropdown and choose `Kafka cluster`, choose **Environments** as `hive_dev` and **Cluster** as `hive_cluster`
 
 <img src="screenshots/api_key.png" />
 
@@ -331,7 +335,7 @@ While resource values are incrementing, the **Manufacturing Parts** section rema
 <img src="screenshots/manufacturing_parts.png" />
 <img src="screenshots/manufacturing_events.png" />
 
-Find a `manufacturing.started` event to view a list of required inputs.  For example as above, starting assembly of an electronics module requires 1 x energy, 3 x silicon and 2 x copper. These resources are acquired at each time step, if available from the **Resources Inventory**, and a `manufacturing.resources.acquired` event is published.  A `manufacturing.blocked` event indicates a manufacturing station cannot proceed due to resources not-yet available in the **Resource Inventory**.
+Find a `manufacturing.started` event to view a list of required inputs.  For example as above, starting assembly of an electronics module requires 1 x energy, 3 x silicon and 2 x copper. These resources are acquired at each time step, if available from the **Resources Inventory**, and a `manufacturing.resources.acquired` event is published.  A `manufacturing.blocked` event indicates a manufacturing workstation cannot proceed due to resources not-yet available in the **Resource Inventory**.
 
 Click on any event to view full details.  In the next levels, you will learn to combine data from across events to generate new Kafka Topics and publish them into the event stream.  As you do, the UI will evolve to display deeper insights into your robotics manufacturing simulation.
 
@@ -349,4 +353,4 @@ Click on any event to view full details.  In the next levels, you will learn to 
 
 ### Next Step
 
-Proceed to **[Level 2 — Intro to Apache Flink](../level-2-intro-to-apache-flink/README.md)** to turn the `started` and `completed` events into job durations, like the **time to gather silicon and energy resources** and the **time to generate actuators and batteries** required to assemble each robot.  These values will let you know how the production efficiency of each station 
+Proceed to **[Level 2 — Intro to Apache Flink](../level-2-intro-to-apache-flink/README.md)** to turn the `started` and `completed` events into job durations, like the **time to gather silicon and energy resources** and the **time to generate actuators and batteries** required to assemble each robot.  These values will let you know how the production efficiency of each workstation 

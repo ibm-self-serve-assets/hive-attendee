@@ -124,7 +124,7 @@ const AddStationHexagon: React.FC<{ onClick?: () => void; disabled?: boolean; si
       onClick={disabled ? undefined : onClick}
       className={`relative select-none flex-none ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer group'}`}
       style={{ width: size, height }}
-      title={disabled ? 'Not enough coins' : 'Add station (max 3)'}
+      title={disabled ? 'Not enough coins' : 'Add workstation (max 3)'}
     >
       <svg
         viewBox="0 0 100 115"

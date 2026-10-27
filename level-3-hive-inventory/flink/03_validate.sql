@@ -13,6 +13,6 @@
 -- changing, and Flink cannot sort a stream by a regular column.
 -- =============================================================================
 
--- Current stock of all items.
-SELECT item_type, item_id, quantity
+-- Current stock of all items (includes run_id to distinguish multiple simulation runs).
+SELECT run_id, item_type, item_id, quantity
 FROM `hive_inventory_balances`;

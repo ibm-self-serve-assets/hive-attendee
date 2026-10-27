@@ -1,8 +1,8 @@
 # Chevron animation only
 
-`Chevrons.tsx` + `chevrons.css`: one, two or three SVG chevrons, pulsing gently from bottom to top. No extra libraries, timers, station controls or state management. Requires your existing React/TypeScript app.
+`Chevrons.tsx` + `chevrons.css`: one, two or three SVG chevrons, pulsing gently from bottom to top. No extra libraries, timers, workstation controls or state management. Requires your existing React/TypeScript app.
 
-## Use inside your station SVG
+## Use inside your workstation SVG
 
 Copy both files together, then:
 
@@ -47,6 +47,6 @@ Render only the number of paths required for the current tier. Their existing ge
 - `active={false}` removes the animation and uses `inactiveOpacity` (default 1). Use 0.4 for blocked and 1 for paused, if desired.
 - Start animation only for an actual active job. Keep existing blocked/paused status handling in your application.
 - Changing state restarts the cycle. Ordinary re-renders do not, provided the component's key stays stable.
-- Reduced-motion preference disables animation. Keep your existing accessible station status label; animation must not be the only state indicator.
+- Reduced-motion preference disables animation. Keep your existing accessible workstation status label; animation must not be the only state indicator.
 - Adjust `2s` in CSS for cycle duration and the `0.24` multiplier in TSX for the stagger.
 - Inline SVG is required to target individual paths; CSS cannot animate paths inside an SVG loaded through an `<img>`.

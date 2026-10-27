@@ -238,13 +238,77 @@ async def _auto_connect():
                         logger.info(f"AUTO-CONNECT: Simulation {f0['simulation_id'][:8]} is {f0_status}; will provision fresh simulation", extra=MAJOR)
                         store.active_simulation_id = None
                     else:
-                        store.active_simulation_id = f0["simulation_id"]
+                        sim_id = f0["simulation_id"]
                         store.server_epoch = f0["server_epoch"]
-                        store.lifecycle_status = f0_status or store.lifecycle_status
-                        store.running = f0.get("running", store.running)
                         topics_map = f0.get("topics", {})
-                        wait_for_ready = f0_status == "provisioning"
-                        logger.info(f"AUTO-CONNECT: Reconnected to Simulation {f0['simulation_id'][:8]}…", extra=MAJOR)
+                        logger.info(f"AUTO-CONNECT: Found existing simulation {sim_id[:8]}; rotating credentials and restarting…", extra=MAJOR)
+
+                        # Always rotate producer credentials to match current .env, then
+                        # restart the simulation to a clean state. This ensures the sim
+                        # server is always in sync with whatever Confluent environment is
+                        # currently configured, regardless of what has changed since the
+                        # last backend run.
+                        rot_r = await client.put(
+                            f"{config.simulation_server_url}/v1/simulations/{sim_id}/connection",
+                            json={
+                                "bootstrap_server": config.confluent_bootstrap_server,
+                                "producer_credentials": {
+                                    "api_key": config.confluent_api_key,
+                                    "api_secret": config.confluent_api_secret,
+                                },
+                            },
+                            headers={
+                                **headers,
+                                "Idempotency-Key": str(uuid.uuid4()),
+                                "X-Server-Epoch": store.server_epoch,
+                            },
+                        )
+                        if rot_r.status_code >= 400:
+                            logger.warning(f"AUTO-CONNECT: credential rotation returned {rot_r.status_code}; proceeding with restart anyway")
+                        else:
+                            # Wait for the rotation probe to complete before restarting
+                            rot_op_id = rot_r.json().get("operation_id")
+                            if rot_op_id:
+                                rot_deadline = time.monotonic() + 30
+                                while time.monotonic() < rot_deadline:
+                                    await asyncio.sleep(0.25)
+                                    op_r = await client.get(
+                                        f"{config.simulation_server_url}/v1/operations/{rot_op_id}",
+                                        headers=headers,
+                                    )
+                                    if op_r.status_code == 200:
+                                        op_status = op_r.json().get("status")
+                                        if op_status in ("succeeded", "failed"):
+                                            if op_status == "failed":
+                                                logger.warning(f"AUTO-CONNECT: credential rotation failed; proceeding with restart anyway")
+                                            break
+
+                        rst_r = await client.post(
+                            f"{config.simulation_server_url}/v1/simulations/{sim_id}/restart",
+                            json={"start": False},
+                            headers={
+                                **headers,
+                                "Idempotency-Key": str(uuid.uuid4()),
+                                "X-Server-Epoch": store.server_epoch,
+                            },
+                        )
+                        if rst_r.status_code >= 400:
+                            logger.warning(f"AUTO-CONNECT: restart returned {rst_r.status_code}; clearing simulation and provisioning fresh")
+                            store.active_simulation_id = None
+                        else:
+                            rst_data = rst_r.json()
+                            store.active_simulation_id = sim_id
+                            store.server_epoch = rst_data.get("server_epoch", store.server_epoch)
+                            store.reset()
+                            store.lifecycle_status = rst_data.get("lifecycle_status", "paused")
+                            store.running = False
+                            # Set the new run_generation immediately so the consumer's
+                            # store.ingest() guard discards replayed events from the
+                            # previous run before the new run's first snapshot arrives.
+                            new_gen = rst_data.get("run_generation")
+                            if new_gen:
+                                store.run_generation = new_gen
+                            logger.info(f"AUTO-CONNECT: Simulation {sim_id[:8]} restarted cleanly", extra=MAJOR)
 
             if not store.active_simulation_id:
                 logger.info("AUTO-CONNECT: Provisioning new simulation…", extra=MAJOR)

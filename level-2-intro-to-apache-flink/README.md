@@ -8,7 +8,7 @@ However, raw events tell you only what happened at an instant in time:
 - A `*.started` event announces that a job began.
 - A `*.completed` event announces that the job finished.
 
-**The Problem:** There is no single event that tells you how long a job actually took, whether it ran on schedule, or how station performance is trending across stages.
+**The Problem:** There is no single event that tells you how long a job actually took, whether it ran on schedule, or how workstation performance is trending across stages.
 
 **Your Objective:** As a stream processing engineer, you will use **Apache Flink on Confluent Cloud** to correlate unbounded event streams in real time. You will build an interval-join pipeline that pairs started and completed events by `job_id`, calculates job durations and outputs continuous, typed performance metrics to a unified `hive_job_durations` stream.
 
@@ -38,7 +38,7 @@ Your Simulation publishes raw JSON events across three production stages (define
 | **Manufacturing** | `manufacturing-started` | `manufacturing-completed` | Component production at stations (frames, honeycombs) |
 | **Assembly** | `assembly-started` | `assembly-completed` | Final robot assembly lines |
 
-Each event is wrapped in a standard envelope containing metadata (`occurred_at`, `sim_time_minutes`, `simulation_id`, `run_id`) and a `payload` containing `job_id` and the details of the job (resource, station or output).
+Each event is wrapped in a standard envelope containing metadata (`occurred_at`, `sim_time_minutes`, `simulation_id`, `run_id`) and a `payload` containing `job_id` and the details of the job (resource, workstation or output).
 
 ### 2. Output Stream (`hive_job_durations`)
 Flink will create a Kafka topic named `hive_job_durations` and publish a unified, append-only stream with these fields:
@@ -47,7 +47,7 @@ Flink will create a Kafka topic named `hive_job_durations` and publish a unified
 |---|---|---|
 | `job_id` | Shared `payload.job_id` | Correlates both events together |
 | `stage` | `gathering`, `manufacturing`, or `assembly` | Allows cross-stage filtering and grouping |
-| `output_type` | `station_id` | Identifies which station or item type was worked on |
+| `output_type` | `station_id` | Identifies which workstation or item type was worked on |
 | `elapsed_sim_minutes` | `completed.sim_time_minutes - started.sim_time_minutes` | **Exact simulated duration.** Independent of clock drift or Simulation speed. |
 | `elapsed_wall_s` | Difference between `occurred_at` timestamps | **Real-world duration in seconds.** Measures real wall-clock latency. |
 
@@ -67,6 +67,11 @@ AND c.row_time BETWEEN s.row_time - INTERVAL '5' SECOND AND s.row_time + INTERVA
 This tells Flink:
 1. Match records where `job_id` is identical.
 2. Only retain state for the max expected time between tracked events.  Having implemented the simulations ourselves, you know the max time to gather resouces, manufacture parts or assemble robots is hard-coded to 30 seconds.  So the SQL code above will retain state for a max 1 minute of Kafka record time. This means once a `started` event is older than 1 minute without a match, it is evicted from state, keeping memory usage minimal and bounded.  The likelihood of this happenng due to network or compute processing latency is negligible for the simulation.
+
+### Additional Readings
+
+- [Event Time and Watermarks on Confluent Developer](https://developer.confluent.io/courses/apache-flink/timely-stream-processing/)
+- [Video about Event Time and Watermarks on YouTube](https://www.youtube.com/watch?v=sdhwpUAjqaI&t=245s)
 
 ---
 
@@ -105,7 +110,7 @@ You will first configure your environment and run the pipeline using the **Confl
    
    - At the top-right of the **SQL Workspace**, there are two settings drop-down options:
      - **Use catalog**: Select your Confluent Cloud environment, e.g. `hive_dev` (Flink refers to a **Confluent Environment** as a **Catalog**)
-     - **Use database**: Select your Kafka cluster, e.g. `hive_cluster_1`. (Flink refers to a **Confluent Cluster** as a **Database**)
+     - **Use database**: Select your Kafka cluster, e.g. `hive_cluster`. (Flink refers to a **Confluent Cluster** as a **Database**)
 
    <img src="screenshots/screenshot-10.png"/>
 
@@ -208,7 +213,7 @@ We can see that the Resource Gathering stations are operating at different speed
 
 When exploring the Events earlier by clicking to expand their contents, you may have noticed `manufacturing.started` and `assembly.started` events declare the # of each resource/part required to start manufacturing/assembly.  Those numbers have been added to the Dashboard for clarity.  
 
-In addition, a warning rectangle <img src="../level-1-environment-setup/frontend/public/icons/png/warning.png" width="24px"/> is displayed when a station is blocked due to a `manufacturing.blocked` or `assembly.blocked` event.
+In addition, a warning rectangle <img src="../level-1-environment-setup/frontend/public/icons/png/warning.png" width="24px"/> is displayed when a workstation is blocked due to a `manufacturing.blocked` or `assembly.blocked` event.
 
 <img src="screenshots/level_2_dashboard.png"/>
 
@@ -227,10 +232,6 @@ If you run the Simulation for 3 hours and 14 mins (3 mins and 14 seconds in real
 If you run the Simulation longer, you will observe that actuators are the limiting input to robot assembly, with 8 actuators required per robot.  This means robot assembly is blocked most often because too few Metals are being produced.
 
 <img src="screenshots/robot_assembly_blocked.png"/>
-
-#### Orders and Treasury
-
-If you were really paying attention, you would have noticed events related to **Orders** and **Treasury**.  After all, why are you manufacturing robots unless someone placed an order for them.  And while it might be nice to give robots away for free, your manufacturing workflow is generating revenue that is tracked in your Treasury.  But more about that in a later level.
 
 ---
 

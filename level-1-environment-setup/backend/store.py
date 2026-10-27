@@ -7,7 +7,7 @@ Tracks only what the design comp needs:
   - completed counts     from *.completed event payloads
   - in-progress flags    from *.started / *.completed pairing
   - blocked state        from *.blocked event payloads
-  - station inputs       from *.started event payloads (full recipe inputs)
+  - workstation inputs       from *.started event payloads (full recipe inputs)
   - job durations        from hive_job_durations topic (elapsed_sim_minutes per station)
   - stream health
 """
@@ -76,7 +76,7 @@ class DashboardStore:
         self.assembly_blocked: Dict[str, Dict[str, int]] = {}
 
         # Station inputs: captured from *.started payloads; station_id → inputs dict
-        # Preserved across jobs — shows the full recipe the station uses.
+        # Preserved across jobs — shows the full recipe the workstation uses.
         self.manufacturing_inputs: Dict[str, Dict[str, int]] = {}
         self.assembly_inputs: Dict[str, Dict[str, int]] = {}
 
@@ -167,6 +167,12 @@ class DashboardStore:
             env.event_type == "simulation.state"
             and env.payload.get("lifecycle_status") == "expired"
         )
+
+        # Drop events that belong to a previous run generation entirely. This prevents
+        # Kafka replay of old events (after a backend restart + sim restart) from
+        # polluting the store before the new run's first snapshot arrives.
+        if self.run_generation > 0 and not is_expired_snapshot and env.run_generation < self.run_generation:
+            return False
 
         # Always advance sim time and record activity
         if is_expired_snapshot:

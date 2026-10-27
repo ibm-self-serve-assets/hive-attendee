@@ -14,7 +14,7 @@
 --
 -- WHY UPSERT (not append like hive_job_durations)
 --   Inventory is a running balance — the same row is updated every time a
---   delivery arrives or a station consumes inputs.  `changelog.mode = 'upsert'`
+--   delivery arrives or a workstation consumes inputs.  `changelog.mode = 'upsert'`
 --   means Flink emits an updated row for each key change.  The backing Kafka
 --   topic carries a full changelog (inserts + updates).  Tableflow materialises
 --   this as a live Iceberg snapshot of current inventory.
