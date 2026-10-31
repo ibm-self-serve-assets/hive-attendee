@@ -1,3 +1,22 @@
+/** Workstation tier configuration from simulation.initialized → simulation_config. */
+export interface WorkstationTierConfig {
+  tier: number;
+  cost_purchase: number;
+  cost_upgrade: number;
+  interval_sim_minutes: number;
+}
+
+/** Configuration block published in simulation.initialized so the frontend never needs
+ *  hardcoded copies of tier costs, robot prices, or initial station tiers. */
+export interface SimulationConfig {
+  workstation_tiers: WorkstationTierConfig[];
+  /** robot_type → price_in_coins */
+  robot_prices: Record<string, number>;
+  max_station_slots: number;
+  /** station_id → initial tier number */
+  station_initial_tiers: Record<string, number>;
+}
+
 /** A raw event envelope as received from Kafka (kept for the event panels). */
 export interface HiveEvent {
   event_id: string;
@@ -85,6 +104,21 @@ export interface DashboardState {
   // True once the hive_inventory_balances topic exists (created by the attendee's Flink SQL) (unlocks Level 3)
   hive_inventory_balances_ready: boolean;
 
+  // simulation_config from simulation.initialized — null until the event is received
+  simulation_config: SimulationConfig | null;
+
+  // Level 4 order fulfillment counts (reset on new run_generation)
+  orders_placed: number;
+  /** The one currently open order (standing-order model); null until order.placed arrives. */
+  open_order: { order_id: string; quantity_engineer: number; quantity_gatherer: number } | null;
+  orders_fulfilled_engineer: number;
+  orders_fulfilled_gatherer: number;
+  /** Treasury coins — authoritative sum from order.fulfilled events (backend-driven). */
+  treasury_coins: number;
+
+  // True once both order-placed and order-fulfilled topics exist in Confluent (unlocks Level 4)
+  order_topics_ready: boolean;
+
   // Whether the backend has connected your dashboard to the Simulation server and Confluent.
   connection_status: 'connecting' | 'connected' | 'failed';
   // Why the connection failed; empty unless connection_status is 'failed'.
@@ -117,6 +151,13 @@ export const EMPTY_STATE: DashboardState = {
   event_topics_missing: [],
   hive_job_durations_ready: false,
   hive_inventory_balances_ready: false,
+  simulation_config: null,
+  orders_placed: 0,
+  open_order: null,
+  orders_fulfilled_engineer: 0,
+  orders_fulfilled_gatherer: 0,
+  treasury_coins: 0,
+  order_topics_ready: false,
   connection_status: 'connecting',
   connection_issues: [],
 };

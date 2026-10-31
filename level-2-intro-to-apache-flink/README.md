@@ -1,5 +1,13 @@
 # Stream Processing with Apache Flink in Confluent Cloud
 
+## Getting Started with Apache Flink
+
+[Apache Flink](https://flink.apache.org/) is an open-source framework for stateful computations over both unbounded (streaming) and bounded (batch) data. Rather than collecting data and processing it later, Flink processes each event as it arrives, keeping low-latency, fault-tolerant state across a cluster with exactly-once consistency guarantees. It offers layered APIs, from the low-level DataStream API to declarative [Flink SQL](https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/table/overview/), and supports event-time processing with [watermarks](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/), windowing and joins across streams.
+
+[Confluent Cloud for Apache Flink](https://docs.confluent.io/cloud/current/flink/overview.html) is a fully managed, serverless Flink service that integrates natively with Kafka topics, Schema Registry and Tableflow. Kafka topics appear as Flink tables, so you can write plain SQL, such as the [interval joins](https://docs.confluent.io/cloud/current/flink/reference/queries/joins.html) used in this level, with no clusters to provision or manage. The results are written back to Kafka topics as continuously updated, typed streams.
+
+---
+
 ## Overview & Goal
 
 In the Hive workshop, your Simulation emits discrete lifecycle events across different Kafka topics as resources are collected, parts are manufactured and robots are assembled. 
@@ -108,11 +116,11 @@ You will first configure your environment and run the pipeline using the **Confl
 
    <img src="screenshots/screenshot-9.png"/>
    
-   - At the top-right of the **SQL Workspace**, there are two settings drop-down options:
+   - Ensure these two settings a selected.  Look at the top-right of the **SQL Workspace**, for these two drop-downs:
      - **Use catalog**: Select your Confluent Cloud environment, e.g. `hive_dev` (Flink refers to a **Confluent Environment** as a **Catalog**)
      - **Use database**: Select your Kafka cluster, e.g. `hive_cluster`. (Flink refers to a **Confluent Cluster** as a **Database**)
 
-   <img src="screenshots/screenshot-10.png"/>
+   <img src="screenshots/catalog_database_selection.png"/>
 
    - Click the Gear icon at top-right to edit your **Workspace Settings**:
      - **Rename Your Workspace:** to **`hive_job_durations`**.

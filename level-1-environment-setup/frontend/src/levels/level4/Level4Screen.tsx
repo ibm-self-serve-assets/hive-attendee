@@ -2,75 +2,27 @@ import React from 'react';
 import { EventPanel } from '../../components/EventPanel';
 import { FlowDots } from '../../components/FlowDots';
 import { Chevrons } from '../../components/Chevrons';
-import {
-  useLevel4,
-  STATION_METADATA,
-  ADD_STATION_COST,
-  RESOURCE_METADATA,
-  MANUFACTURING_METADATA,
-  ASSEMBLY_METADATA,
-  INITIAL_STATIONS,
-  MAX_STATIONS,
-} from './Level4Context';
+import { useLevel4 } from './Level4Context';
 import type { LevelScreenProps } from '../types';
-
-// Inventory order: copper energy metals / resin silicon
-// Gathering grid: copper energy / metals resin / silicon
-const RESOURCES: { id: string; label: string; icon: string }[] = [
-  { id: 'copper',  label: 'Copper',  icon: '/icons/svg/resource_copper.svg' },
-  { id: 'energy',  label: 'Energy',  icon: '/icons/svg/resources_energy.svg' },
-  { id: 'metals',  label: 'Metals',  icon: '/icons/svg/resources_metals.svg' },
-  { id: 'resin',   label: 'Resin',   icon: '/icons/svg/resources_resin.svg' },
-  { id: 'silicon', label: 'Silicon', icon: '/icons/svg/resources_silicon.svg' },
-];
-
-const GATHERING_ORDER = ['copper', 'energy', 'metals', 'resin', 'silicon'];
-
-const RESOURCE_ICON: Record<string, string> = {
-  energy:    '/icons/svg/resources_energy.svg',
-  resin:     '/icons/svg/resources_resin.svg',
-  silicon:   '/icons/svg/resources_silicon.svg',
-  metals:    '/icons/svg/resources_metals.svg',
-  copper:    '/icons/svg/resource_copper.svg',
-};
-
-const PARTS: { id: string; label: string; icon: string }[] = [
-  { id: 'actuator',    label: 'Actuators',   icon: '/icons/svg/parts_actuator.svg' },
-  { id: 'battery',     label: 'Batteries',   icon: '/icons/svg/parts_battery.svg' },
-  { id: 'chassis',     label: 'Chassis',     icon: '/icons/svg/parts_chassis.svg' },
-  { id: 'electronics', label: 'Electronics', icon: '/icons/svg/parts_electronics.svg' },
-];
-
-const PART_ICON: Record<string, string> = {
-  chassis:     '/icons/svg/parts_chassis.svg',
-  electronics: '/icons/svg/parts_electronics.svg',
-  actuator:    '/icons/svg/parts_actuator.svg',
-  battery:     '/icons/svg/parts_battery.svg',
-};
-
-const STATIONS: { id: string; label: string; icon: string; output_type: string }[] = [
-  { id: 'actuator_fabrication', label: 'Actuator Fabrication', icon: '/icons/svg/parts_actuator.svg',    output_type: 'actuator' },
-  { id: 'battery_assembly',     label: 'Battery Assembly',     icon: '/icons/svg/parts_battery.svg',     output_type: 'battery' },
-  { id: 'structural_molding',   label: 'Chassis Molding',      icon: '/icons/svg/parts_chassis.svg',     output_type: 'chassis' },
-  { id: 'electronics_assembly', label: 'Electronics Assembly', icon: '/icons/svg/parts_electronics.svg', output_type: 'electronics' },
-];
-
-const ROBOTS: { id: string; station_id: string; label: string; icon: string }[] = [
-  { id: 'engineer', station_id: 'worker_assembly',  label: 'Engineer', icon: '/icons/svg/robot-engineer.svg' },
-  { id: 'forager',  station_id: 'forager_assembly', label: 'Forager',  icon: '/icons/svg/harvester.svg' },
-];
-
-// ── Hexagon Tier Badge Components ────────────────────────────────────────────
-
+import {
+  GATHERING_ORDER,
+  RESOURCES,
+  RESOURCE_ICON,
+  STATIONS,
+  ROBOTS,
+  PARTS,
+  PART_ICON,
+} from '../robots';
+ 
 const HexagonTierBadge: React.FC<{
-  level: number;
+  tier: number;
   blocked?: boolean;
   active?: boolean;
   tooltip?: string;
   size?: number;
-}> = ({ level, blocked = false, active = false, tooltip, size = 50 }) => {
+}> = ({ tier: tierProp, blocked = false, active = false, tooltip, size = 50 }) => {
   const height = Math.round(size * 1.15);
-  const tier = (Math.max(1, Math.min(3, level))) as 1 | 2 | 3;
+  const tier = (Math.max(1, Math.min(3, tierProp))) as 1 | 2 | 3;
 
   return (
     <div className="relative select-none flex-none" style={{ width: size, height }}>
@@ -205,12 +157,15 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
   } = state;
 
   const level4 = useLevel4();
-  const stationSlots = level4?.stationSlots ?? INITIAL_STATIONS;
+  const stationSlots = level4?.stationSlots ?? {};
   const coins = level4?.coins ?? 0;
+  const tierCosts = level4?.tierCosts ?? {};
+  const addCost = level4?.addStationCost ?? 1000;
+  const maxStations = level4?.maxStations ?? 3;
   const addStation = level4?.addStation ?? (() => {});
   const upgradeStation = level4?.upgradeStation ?? (() => {});
 
-  const canAffordAdd = coins >= ADD_STATION_COST;
+  const canAffordAdd = coins >= addCost;
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -237,8 +192,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                   const { id, label, icon } = res;
                   const blocked = false;
                   const dur = job_durations[id];
-                  const meta = RESOURCE_METADATA[id] ?? { level: 1 };
-                  const slots = stationSlots[id] ?? [{ id: 1, level: meta.level }];
+                  const slots = stationSlots[id] ?? [{ id: 1, tier: 1 }];
 
                   return (
                     <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-start gap-3">
@@ -251,15 +205,15 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       {/* Stations row (up to 3) + Add button */}
                       <div className="flex items-start justify-start gap-3 flex-wrap">
                         {slots.map((st, idx) => {
-                          const cost = STATION_METADATA[st.level]?.cost_upgrade ?? 100;
-                          const isMax = st.level >= 3 || cost === -1;
+                          const cost = tierCosts[st.tier]?.cost_upgrade ?? 250;
+                          const isMax = st.tier >= 3 || cost === -1;
                           const canAfford = !isMax && coins >= cost;
-                          const durationText = dur != null ? `${dur} mins` : `${STATION_METADATA[st.level]?.interval_sim_minutes ?? 10} mins`;
+                          const durationText = dur != null ? `${dur} mins` : `${tierCosts[st.tier]?.interval_sim_minutes ?? 10} mins`;
 
                           return (
                             <div key={st.id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
                               <HexagonTierBadge
-                                level={st.level}
+                                tier={st.tier}
                                 blocked={blocked}
                                 active={running}
                                 tooltip="Waiting for resources"
@@ -303,7 +257,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           );
                         })}
 
-                        {slots.length < MAX_STATIONS && (
+                        {slots.length < maxStations && (
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
@@ -325,7 +279,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                   : 'bg-[#E2E8F4] text-[#8C9BAE] cursor-not-allowed'
                               }`}
                             >
-                              <span>{ADD_STATION_COST}</span>
+                              <span>{addCost}</span>
                               <img
                                 src="/icons/svg/coin.svg"
                                 width={13}
@@ -373,8 +327,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                   const dur        = job_durations[id] ?? job_durations[output_type];
                   const inputs     = manufacturing_inputs[id] ?? {};
                   const missingSet = blocked ? new Set(Object.keys(manufacturing_blocked[id] ?? {})) : undefined;
-                  const meta       = MANUFACTURING_METADATA[id] ?? { level: 1 };
-                  const slots      = stationSlots[id] ?? [{ id: 1, level: meta.level }];
+                  const slots      = stationSlots[id] ?? [{ id: 1, tier: 1 }];
 
                   return (
                     <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-start gap-3">
@@ -388,15 +341,15 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       {/* Stations row (up to 3) + Add button */}
                       <div className="flex items-start justify-start gap-3 flex-wrap">
                         {slots.map((st, idx) => {
-                          const cost = STATION_METADATA[st.level]?.cost_upgrade ?? 100;
-                          const isMax = st.level >= 3 || cost === -1;
+                          const cost = tierCosts[st.tier]?.cost_upgrade ?? 250;
+                          const isMax = st.tier >= 3 || cost === -1;
                           const canAfford = !isMax && coins >= cost;
-                          const durationText = dur != null ? `${dur} mins` : `${STATION_METADATA[st.level]?.interval_sim_minutes ?? 10} mins`;
+                          const durationText = dur != null ? `${dur} mins` : `${tierCosts[st.tier]?.interval_sim_minutes ?? 10} mins`;
 
                           return (
                             <div key={st.id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
                               <HexagonTierBadge
-                                level={st.level}
+                                tier={st.tier}
                                 blocked={blocked}
                                 active={running}
                                 tooltip="Waiting for resources"
@@ -440,7 +393,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           );
                         })}
 
-                        {slots.length < MAX_STATIONS && (
+                        {slots.length < maxStations && (
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
@@ -462,7 +415,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                   : 'bg-[#E2E8F4] text-[#8C9BAE] cursor-not-allowed'
                               }`}
                             >
-                              <span>{ADD_STATION_COST}</span>
+                              <span>{addCost}</span>
                               <img
                                 src="/icons/svg/coin.svg"
                                 width={13}
@@ -511,14 +464,13 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                   const dur         = job_durations[station_id] ?? job_durations[id];
                   const inputs      = assembly_inputs[station_id] ?? {};
                   const missingSet  = blocked ? new Set(Object.keys(assembly_blocked[station_id] ?? {})) : undefined;
-                  const meta        = ASSEMBLY_METADATA[station_id] ?? { level: 1 };
-                  const slots       = stationSlots[station_id] ?? [{ id: 1, level: meta.level }];
+                  const slots       = stationSlots[station_id] ?? [{ id: 1, tier: 1 }];
 
                   return (
                     <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-start gap-3">
                       {/* Header with Icon, Label, and Input chips */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <img src={icon} width={28} height={28} alt={label} style={{ objectFit: 'contain' }} />
+                        <img src={icon} width={40} height={40} alt={label} style={{ objectFit: 'contain' }} />
                         <span className="text-sm font-semibold text-[#031040] mr-1">{label}</span>
                         <InputChips inputs={inputs} iconMap={PART_ICON} blockedKeys={missingSet} />
                       </div>
@@ -526,15 +478,15 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       {/* Stations row (up to 3) + Add button */}
                       <div className="flex items-start justify-start gap-3 flex-wrap">
                         {slots.map((st, idx) => {
-                          const cost = STATION_METADATA[st.level]?.cost_upgrade ?? 100;
-                          const isMax = st.level >= 3 || cost === -1;
+                          const cost = tierCosts[st.tier]?.cost_upgrade ?? 250;
+                          const isMax = st.tier >= 3 || cost === -1;
                           const canAfford = !isMax && coins >= cost;
-                          const durationText = dur != null ? `${dur} mins` : `${STATION_METADATA[st.level]?.interval_sim_minutes ?? 10} mins`;
+                          const durationText = dur != null ? `${dur} mins` : `${tierCosts[st.tier]?.interval_sim_minutes ?? 10} mins`;
 
                           return (
                             <div key={st.id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
                               <HexagonTierBadge
-                                level={st.level}
+                                tier={st.tier}
                                 blocked={blocked}
                                 active={running}
                                 tooltip="Waiting for parts"
@@ -578,7 +530,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           );
                         })}
 
-                        {slots.length < MAX_STATIONS && (
+                        {slots.length < maxStations && (
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(station_id)}
@@ -600,7 +552,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                   : 'bg-[#E2E8F4] text-[#8C9BAE] cursor-not-allowed'
                               }`}
                             >
-                              <span>{ADD_STATION_COST}</span>
+                              <span>{addCost}</span>
                               <img
                                 src="/icons/svg/coin.svg"
                                 width={13}

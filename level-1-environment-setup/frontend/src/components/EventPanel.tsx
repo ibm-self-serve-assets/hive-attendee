@@ -30,7 +30,7 @@ const fmtCounts = (obj: unknown): string => {
 /** One useful line of detail drawn from the event payload. */
 export function describeEvent(ev: HiveEvent): string {
   const p = ev.payload ?? {};
-  const workstation = typeof p.station_id === 'string' ? titleCase(p.station_id) : '';
+  const station = typeof p.station_id === 'string' ? titleCase(p.station_id) : '';
   switch (ev.event_type) {
     case 'gathering.started':
       return `${titleCase(String(p.station_id ?? ''))}`;

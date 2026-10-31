@@ -10,6 +10,54 @@
         "probe": { "type": "boolean", "const": true }
       },
       "additionalProperties": false
+    },
+    "simulation.initialized": {
+      "description": "Published once to simulation-state (compact topic) when provisioning succeeds.",
+      "type": "object",
+      "required": ["operation_id", "attendee_id", "expires_at", "station_recipes", "simulation_config"],
+      "properties": {
+        "operation_id": { "type": "string", "format": "uuid" },
+        "attendee_id": { "type": "string" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "station_recipes": {
+          "type": "object",
+          "description": "BOM per station: station_id → { input_id: quantity }",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "simulation_config": {
+          "type": "object",
+          "required": ["workstation_tiers", "robot_prices", "max_station_slots", "station_initial_tiers"],
+          "properties": {
+            "workstation_tiers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["tier", "cost_purchase", "cost_upgrade", "interval_sim_minutes"],
+                "properties": {
+                  "tier": { "type": "integer", "minimum": 1 },
+                  "cost_purchase": { "type": "integer", "minimum": 0 },
+                  "cost_upgrade": { "type": "integer" },
+                  "interval_sim_minutes": { "type": "integer", "minimum": 1 }
+                }
+              }
+            },
+            "robot_prices": {
+              "type": "object",
+              "description": "robot_type → price_in_coins",
+              "additionalProperties": { "type": "integer", "minimum": 0 }
+            },
+            "max_station_slots": { "type": "integer", "minimum": 1 },
+            "station_initial_tiers": {
+              "type": "object",
+              "description": "station_id → initial tier number",
+              "additionalProperties": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
     }
   },
   "topics": {
@@ -129,11 +177,11 @@
         "job_id": { "type": "string", "format": "uuid" },
         "station_id": {
           "type": "string",
-          "enum": ["worker_assembly", "forager_assembly"]
+          "enum": ["worker_assembly", "gatherer_assembly"]
         },
         "output_type": {
           "type": "string",
-          "enum": ["engineer", "forager"]
+          "enum": ["engineer", "gatherer"]
         },
         "inputs": {
           "type": "object",
@@ -149,11 +197,11 @@
         "job_id": { "type": "string", "format": "uuid" },
         "station_id": {
           "type": "string",
-          "enum": ["worker_assembly", "forager_assembly"]
+          "enum": ["worker_assembly", "gatherer_assembly"]
         },
         "output_type": {
           "type": "string",
-          "enum": ["engineer", "forager"]
+          "enum": ["engineer", "gatherer"]
         },
         "quantity": { "type": "integer", "const": 1 }
       },
@@ -165,7 +213,7 @@
       "properties": {
         "station_id": {
           "type": "string",
-          "enum": ["worker_assembly", "forager_assembly"]
+          "enum": ["worker_assembly", "gatherer_assembly"]
         },
         "missing_inputs": {
           "type": "object",
@@ -181,7 +229,7 @@
       "properties": {
         "station_id": {
           "type": "string",
-          "enum": ["worker_assembly", "forager_assembly"]
+          "enum": ["worker_assembly", "gatherer_assembly"]
         },
         "inputs_acquired": {
           "type": "object",
@@ -202,7 +250,8 @@
         "parts",
         "stations",
         "completed_robots",
-        "last_applied_command_id"
+        "last_applied_command_id",
+        "treasury_coins"
       ],
       "properties": {
         "lifecycle_status": {
@@ -325,7 +374,7 @@
             "count": { "type": "integer", "minimum": 0 },
             "last_robot_id": {
               "type": ["string", "null"],
-              "enum": ["engineer", "forager", null]
+              "enum": ["engineer", "gatherer", null]
             }
           },
           "additionalProperties": false
@@ -333,6 +382,11 @@
         "last_applied_command_id": {
           "type": ["string", "null"],
           "format": "uuid"
+        },
+        "treasury_coins": {
+          "description": "Cumulative coins earned from fulfilled orders this run.",
+          "type": "integer",
+          "minimum": 0
         },
         "debug_mode_instructor_only": {
           "description": "Ground-truth inventory snapshot injected when the server is in debug mode. Null when debug mode is off. DO NOT use this field in attendee views — it is absent in normal runs.",

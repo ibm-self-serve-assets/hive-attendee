@@ -19,7 +19,7 @@ except ImportError:
 
 POLL_SECONDS = 3.0
 
-_SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "spec-shared" / "schemas" / "event_payloads.json"
+_SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "spec-shared" / "schemas" / "event_payloads_base.json"
 
 
 def load_event_topic_names() -> List[str]:
@@ -90,7 +90,7 @@ class EventTopicsWatcher:
                     self.store.event_topics_ready = ready
                     self.store.event_topics_missing = missing
                     logger.info(
-                        "Event topics ready." if ready else f"Event topics missing: {', '.join(missing)}",
+                        "All topics present." if ready else f"Topics missing: {', '.join(missing)}",
                         extra=MAJOR,
                     )
                     await self.on_change()
@@ -153,7 +153,7 @@ class CalculatedValuesWatcher:
             try:
                 if await asyncio.to_thread(self._topic_exists):
                     self.store.hive_job_durations_ready = True
-                    logger.info(f"Topic {self.topic} exists; Level 2 unlocked.", extra=MAJOR)
+                    logger.info(f"Level 2 unlocked: Topic {self.topic} exists", extra=MAJOR)
                     await self.on_change()
                     return
             except asyncio.CancelledError:
@@ -214,11 +214,73 @@ class InventoryBalancesWatcher:
             try:
                 if await asyncio.to_thread(self._topic_exists):
                     self.store.hive_inventory_balances_ready = True
-                    logger.info(f"Topic {self.topic} exists; Level 3 unlocked.", extra=MAJOR)
+                    logger.info(f"Level 3 unlocked: Topic {self.topic} exists", extra=MAJOR)
                     await self.on_change()
                     return
             except asyncio.CancelledError:
                 return
             except Exception as e:
                 logger.debug(f"Inventory topic check failed: {e}")
+            await asyncio.sleep(POLL_SECONDS)
+
+
+class OrderTopicsWatcher:
+    """
+    Polls Confluent Cloud until both `order-placed` and `order-fulfilled` topics exist
+    (created by Level 4's provision_order_topics.sh), then sets `store.order_topics_ready`.
+    Only checks that the topics exist; it never reads records.
+    """
+
+    ORDER_TOPICS = ["order-placed", "order-fulfilled"]
+
+    def __init__(
+        self,
+        store: DashboardStore,
+        bootstrap_servers: Optional[str],
+        api_key: Optional[str],
+        api_secret: Optional[str],
+        on_change: Callable[[], Awaitable[None]],
+    ):
+        self.store = store
+        self.on_change = on_change
+        self._conf = {
+            "bootstrap.servers": bootstrap_servers,
+            "security.protocol": "SASL_SSL",
+            "sasl.mechanisms": "PLAIN",
+            "sasl.username": api_key,
+            "sasl.password": api_secret,
+            "enable.metrics.push": False,
+        }
+        self._enabled = bool(KAFKA_AVAILABLE and bootstrap_servers and api_key and api_secret)
+        self._task: Optional[asyncio.Task] = None
+
+    def start(self) -> None:
+        if not self._enabled or self._task:
+            return
+        self._task = asyncio.create_task(self._run())
+
+    def stop(self) -> None:
+        if self._task:
+            self._task.cancel()
+            self._task = None
+
+    def _both_topics_exist(self) -> bool:
+        meta = AdminClient(self._conf, logger=kafka_logger).list_topics(timeout=5)
+        return all(
+            meta.topics.get(t) is not None and meta.topics[t].error is None
+            for t in self.ORDER_TOPICS
+        )
+
+    async def _run(self) -> None:
+        while not self.store.order_topics_ready:
+            try:
+                if await asyncio.to_thread(self._both_topics_exist):
+                    self.store.order_topics_ready = True
+                    logger.info("Level 4 unlocked: Order topics (order-placed, order-fulfilled) exist", extra=MAJOR)
+                    await self.on_change()
+                    return
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                logger.debug(f"Order topics check failed: {e}")
             await asyncio.sleep(POLL_SECONDS)

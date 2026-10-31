@@ -390,6 +390,11 @@ def check_confluent(config: BackendConfig, timeout: float = 6.0) -> Optional[Iss
     }, logger=_silent_kafka_logger)
     try:
         client.list_topics(timeout=timeout)
+        if errors:
+            client.poll(0.1)
+            names = [e.name() for e in errors]
+            first = str(errors[0])
+            return classify_confluent_error(config, names, first)
         return None
     except KafkaException as exc:
         client.poll(0.5)  # delivers the underlying error (auth, DNS, TLS) to error_cb

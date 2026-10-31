@@ -253,33 +253,27 @@ When your backend registers your Simulation in the next step, the Simulation fir
 
 ## Step 5: Start the Backend Service
 
-Once [spec-shared/.env](../spec-shared/.env) is configured and your topics exist, start the backend service:
+Once [spec-shared/.env](../spec-shared/.env) is configured and your topics exist, start the backend service by opening a Terminal/Console window and entering these commands:
 
 ```bash
 cd level-1-environment-setup/backend
 ./start_backend.sh
 ```
 
-The backend will start at `http://localhost:8001`.
+The backend will start at `http://localhost:8001`.  Do not close this terminal window
 
 ### What happens when the backend starts
 
 The first time the backend starts, it automatically connects your laptop, the Hive Simulation server and your Confluent Cloud cluster ([`backend/app.py`](backend/app.py#L121-L216)). You don't need to do anything for this to happen:
 
 1. **It reads your configuration.** The backend loads [spec-shared/.env](../spec-shared/.env) and checks it. If a value is missing, still a placeholder such as `CHANGE_ME`, or badly formatted, it stops there and reports the problem (see [If the connection fails](#if-the-connection-fails)).
-2. **It registers your Hive Dashboard with the Hive Simulation server.** The backend identifies you with your workshop access token and sends the server your Confluent bootstrap server, API key and API secret. The server creates your own personal robotic manufacturing Simulation and returns a **Simulation ID**, which the dashboard shows at the bottom of the sidebar. If you already have a simulation, the backend reconnects to it instead, and a Simulation that has finished its simulated week is replaced with a fresh one.
+2. **It registers your Hive Dashboard with the Hive Simulation server.** The backend identifies you with your workshop access token and sends the server your Confluent bootstrap server, API key and API secret. The server creates your own personal robotic manufacturing Simulation and returns a **Simulation ID**, which the dashboard shows at the bottom-left in the sidebar.
 3. **The Hive Simulation server checks your Confluent Cloud cluster.** Using the credentials from [spec-shared/.env](../spec-shared/.env), it confirms that every event topic from [Step 4](#step-4-provision-your-kafka-topics) exists and that it is allowed to write to them, then sends a small test event to each. Once those checks pass, your Simulation is ready, and it waits in a paused state.
 4. **The backend watches your cluster for the event topics.** It checks every few seconds that all of them exist, and streams the events to the dashboard in your browser as they arrive.
 
-Your Simulation publishes nothing until you press **Run** in [Step 8](#step-8-run-your-simulation).
+### Backend connection errors
 
-### If the connection fails
-
-When a check fails, the backend prints a `CONNECTION PROBLEM` block in its terminal, and the dashboard shows the same problem in place of the factory view. Your secrets are never printed.
-
-After you change [spec-shared/.env](../spec-shared/.env), **restart the backend** (`./start_backend.sh`). The file is only read at startup.
-
-`CONFLUENT_CLUSTER_ID` and `CONFLUENT_REST_ENDPOINT` are only used by the topic provisioning script in [Step 4](#step-4-provision-your-kafka-topics), so the backend doesn't check them.
+Check the console running your Backend server for any errors.   If you make changes to [spec-shared/.env](../spec-shared/.env), **restart the backend server** (`./start_backend.sh`) as the file is only read at server startup.
 
 ---
 
@@ -292,7 +286,7 @@ cd level-1-environment-setup/frontend
 npm install
 npm run dev
 ```
-Open your browser at **`http://localhost:5174`** (or the port displayed in your terminal).
+Open your browser at **`http://localhost:5174`** (or the port displayed in your terminal).  If you see errors or warnings, follow the instructions to resolve them.  Also check your backend server terminal window for errors.
 
 ---
 

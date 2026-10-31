@@ -12,7 +12,7 @@ export const FlowDots: React.FC<FlowDotsProps> = ({ running = true }) => {
   return (
     <div
       className="flex items-center justify-center select-none"
-      style={{ width: '32px', flexShrink: 0, marginTop: '35px' }}
+      style={{ width: '32px', flexShrink: 0, marginTop: '170px' }}
     >
       <div className="flex gap-1">
         {Array.from({ length: numDots }, (_, i) => {

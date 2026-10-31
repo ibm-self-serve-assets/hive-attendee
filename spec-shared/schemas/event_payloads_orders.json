@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive.example.com/schemas/events_orders.json",
+  "description": "Level 4 order fulfillment events. Load alongside event_payloads_base.json.",
+  "topics": {
+    "order.placed": {
+      "type": "object",
+      "required": ["order_id", "quantity_engineer", "quantity_gatherer", "created_at_sim_minute"],
+      "properties": {
+        "order_id": { "type": "string" },
+        "quantity_engineer": { "type": "integer", "minimum": 0 },
+        "quantity_gatherer": { "type": "integer", "minimum": 0 },
+        "created_at_sim_minute": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "order.fulfilled": {
+      "type": "object",
+      "required": [
+        "order_id",
+        "quantity_engineer",
+        "quantity_gatherer",
+        "coins_received",
+        "fulfilled_at_sim_minute"
+      ],
+      "properties": {
+        "order_id": { "type": "string" },
+        "quantity_engineer": { "type": "integer", "minimum": 0 },
+        "quantity_gatherer": { "type": "integer", "minimum": 0 },
+        "coins_received": { "type": "integer", "minimum": 0 },
+        "fulfilled_at_sim_minute": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

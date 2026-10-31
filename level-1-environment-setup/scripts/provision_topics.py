@@ -63,7 +63,7 @@ _SPEC_DIR = Path(__file__).resolve().parent
 _SHARED_ENV = _SPEC_DIR.parent.parent / "spec-shared" / ".env"
 ENV_PATH = _SHARED_ENV if _SHARED_ENV.exists() else _SPEC_DIR / ".env"
 
-_SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "spec-shared" / "schemas" / "event_payloads.json"
+_SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "spec-shared" / "schemas" / "event_payloads_base.json"
 
 # ── Topic configuration ───────────────────────────────────────────────────────
 # Activity events: keep for 24 hours then discard.

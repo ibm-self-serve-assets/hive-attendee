@@ -205,6 +205,10 @@ def test_classify_confluent_error(names, expected):
 
 
 def test_check_confluent_reports_unresolvable_host():
+    try:
+        import confluent_kafka
+    except ImportError:
+        pytest.skip("confluent_kafka not installed")
     cfg = make_config(confluent_bootstrap_server="pkc-does-not-exist.invalid:9092")
     issue = ci.check_confluent(cfg, timeout=4.0)
     assert issue is not None

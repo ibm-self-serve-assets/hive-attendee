@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DashboardState, fmtSimTime } from '../types';
 import { LEVELS } from '../levels/registry';
-import { useLevel4 } from '../levels/level4/Level4Context';
 
 interface SidebarProps {
   state: DashboardState;
@@ -21,6 +20,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLevelChange,
   isReady = true,
 }) => {
+  const [simInfoOpen, setSimInfoOpen] = useState(false);
   const { stream_health, lifecycle_status, running, sim_time_minutes, active_simulation_id, run_id, attendee_id } = state;
   const isLive = stream_health === 'live';
   const isExpired = lifecycle_status === 'expired';
@@ -35,9 +35,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Show sim time once the sim is running, even before the level has Flink data
   const showSimTime = isUnlocked && (isReady || state.running);
 
-  const level4 = useLevel4();
-  const coins = level4?.coins ?? 0;
-
   return (
     <aside
       className="shrink-0 flex flex-col justify-between border-r border-[#1A2760]"
@@ -47,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* ── Level selector ── */}
         <section>
-          <label htmlFor="level-select" className="block text-xs font-bold text-white mb-3">
+          <label htmlFor="level-select" className="block text-md font-bold text-white mb-3">
             Levels
           </label>
           <select
@@ -68,12 +65,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* ── Simulation controls ── */}
         <section>
-          <h2 className="text-xs font-bold text-white mb-3">Simulation controls</h2>
+          <h2 className="text-md font-bold text-white mb-3">Simulation controls</h2>
 
           {/* Connection status */}
-          <div className="flex items-center gap-2 text-white text-sm mb-3">
+          <div className="flex items-center gap-2 text-white font-semibold text-sm mb-3">
             <span
-              className={`w-2.5 h-2.5 rounded-full ${
+              className={`w-4 h-4 rounded-full ${
                 connectionFailed
                   ? 'bg-red-500'
                   : stream_health === 'stale'
@@ -160,8 +157,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* ── Simulation time (hidden while locked or not ready) ── */}
         {showSimTime && (
           <section>
-            <div className="flex items-center gap-2 text-[#8AA0D0] text-xs mb-1">
-              <img src="/icons/svg/clock.svg" width={16} height={16} alt="clock" className="opacity-70" />
+            <div className="flex items-center gap-2 text-[#8AA0D0] text-sm font-semibold text-white mb-1">
+              <img src="/icons/svg/clock.svg" width={24} height={24} alt="clock" className="opacity-70" />
               <span>Simulation Time</span>
             </div>
             <div className="font-bold font-mono text-white text-xl tabular-nums tracking-tight">
@@ -176,36 +173,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <hr className="border-t border-[#2A4896]" />
 
             <section>
-              <h2 className="text-xs font-bold text-white mb-3">Orders</h2>
+              <h2 className="flex items-center gap-2 text-md font-bold text-white mb-3">
+                <span>Open Orders</span>
+              </h2>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <img
-                      src="/icons/svg/order-engineer.svg"
-                      width={28}
-                      height={28}
+                      src="/icons/svg/robot_engineer_body.svg"
+                      width={40}
+                      height={40}
                       alt="Engineer"
                       className="rounded"
                     />
                     <span className="text-sm font-semibold text-white">Engineer</span>
                   </div>
                   <span className="font-bold font-mono text-white text-sm tabular-nums">
-                    {state.inventory.robot?.engineer ?? 0}
+                    {state.open_order?.quantity_engineer ?? 0}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <img
-                      src="/icons/svg/order-forager.svg"
-                      width={28}
-                      height={28}
-                      alt="Forager"
+                      src="/icons/svg/robot_gatherer_body.svg"
+                      width={40}
+                      height={40}
+                      alt="Gatherer"
                       className="rounded"
                     />
-                    <span className="text-sm font-semibold text-white">Forager</span>
+                    <span className="text-sm font-semibold text-white">Gatherer</span>
                   </div>
                   <span className="font-bold font-mono text-white text-sm tabular-nums">
-                    {state.inventory.robot?.forager ?? 0}
+                    {state.open_order?.quantity_gatherer ?? 0}
                   </span>
                 </div>
               </div>
@@ -214,7 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <hr className="border-t border-[#2A4896]" />
 
             <section>
-              <h2 className="text-xs font-bold text-white mb-3">Treasury</h2>
+              <h2 className="text-md font-bold text-white mb-3">Treasury</h2>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <img
@@ -227,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span className="text-sm font-semibold text-white">Coins</span>
                 </div>
                 <span className="font-bold font-mono text-white text-sm tabular-nums">
-                  {coins}
+                  {state.treasury_coins}
                 </span>
               </div>
             </section>
@@ -236,29 +235,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       </div>
 
-      <div className="border-t border-[#2A4896] px-5 py-3 text-[10px] text-white">
-        Closing this app does not pause the hosted simulation.
-        {(attendee_id || active_simulation_id) && (
-          <hr className="border-t border-white my-2" />
+      <div className="border-t border-[#2A4896] px-5 py-3 text-white">
+        <button
+          type="button"
+          onClick={() => setSimInfoOpen((prev) => !prev)}
+          className="w-full flex items-center justify-between text-left cursor-pointer"
+          aria-expanded={simInfoOpen}
+        >
+          <span className="text-xs font-bold text-white">Simulation Info</span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`text-white transition-transform duration-200 ${simInfoOpen ? 'rotate-180' : ''}`}
+            aria-hidden="true"
+          >
+            <path d="M5 7.5l5 5 5-5" />
+          </svg>
+        </button>
+
+        {simInfoOpen && (
+          <div className="mt-2 space-y-2 text-[11px]">
+            {attendee_id && (
+              <div>
+                <div className="font-bold">Attendee ID</div>
+                <div className="font-mono text-[11px] break-all">{attendee_id}</div>
+              </div>
+            )}
+            {active_simulation_id && (
+              <div>
+                <div className="font-bold">Simulation ID</div>
+                <div className="font-mono text-[11px] break-all">{active_simulation_id}</div>
+              </div>
+            )}
+            {run_id && (
+              <div>
+                <div className="font-bold">Run ID</div>
+                <div className="font-mono text-[11px] break-all">{run_id}</div>
+              </div>
+            )}
+          </div>
         )}
-        {attendee_id && (
-          <>
-            <div className="font-bold">Attendee ID</div>
-            <div className="font-mono text-[11px] break-all">{attendee_id}</div>
-          </>
-        )}
-        {active_simulation_id && (
-          <>
-            <div className={`font-bold ${attendee_id ? 'mt-2' : ''}`}>Simulation ID</div>
-            <div className="font-mono text-[11px] break-all">{active_simulation_id}</div>
-          </>
-        )}
-        {run_id && (
-          <>
-            <div className="font-bold mt-2">Run ID</div>
-            <div className="font-mono text-[11px] break-all">{run_id}</div>
-          </>
-        )}
+
+        <hr className="border-t border-white my-2" />
+
+        <div className="text-[11px] text-white">
+          Closing this app does not pause the hosted simulation.
+        </div>
       </div>
     </aside>
   );

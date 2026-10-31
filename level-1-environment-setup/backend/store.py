@@ -12,10 +12,14 @@ Tracks only what the design comp needs:
   - stream health
 """
 
+import logging
 import time
 from typing import Dict, List, Optional, Any
 
+from backend.log_setup import MAJOR
 from backend.models import EventEnvelope
+
+logger = logging.getLogger("hive.store")
 
 
 # ── Resource label / icon mapping ────────────────────────────────────────────
@@ -32,7 +36,7 @@ MANUFACTURING_STATIONS = [
 # Assembly stations and their robot output
 ASSEMBLY_STATIONS = {
     "worker_assembly": "engineer",
-    "forager_assembly": "forager",
+    "gatherer_assembly": "gatherer",
 }
 
 # Recent raw events kept per dashboard section (newest first), keyed by event_type prefix.
@@ -47,6 +51,11 @@ class DashboardStore:
         self.server_epoch: Optional[str] = None
         # run_id of the most recent event; matches the run_id column in hive_job_durations
         self.run_id: Optional[str] = None
+
+        # simulation_config from simulation.initialized — carries workstation tiers,
+        # robot prices, max_station_slots, and station_initial_tiers.
+        # None until the first simulation.initialized event is ingested.
+        self.simulation_config: Optional[Dict[str, Any]] = None
 
         # sim time — updated from every envelope
         self.latest_sim_time_minutes: int = 0
@@ -107,6 +116,16 @@ class DashboardStore:
         # Independent of the Simulation run, so reset() leaves it alone.
         self.hive_inventory_balances_ready: bool = False
 
+        # Level 4 order fulfillment state — reset on new run_generation
+        self.orders_placed: int = 0
+        self.open_order: Optional[Dict[str, Any]] = None
+        self.orders_fulfilled_engineer: int = 0
+        self.orders_fulfilled_gatherer: int = 0
+        self.treasury_coins: int = 0
+
+        # Level 4 gate: both order topics exist in Confluent (created by provision_order_topics.sh)
+        self.order_topics_ready: bool = False
+
         # Connection to the Simulation server / Confluent, set by auto_connect:
         #   'connecting' | 'connected' | 'failed'
         # `connection_issues` holds plain-language problems (backend.connection_issues.Issue
@@ -137,6 +156,12 @@ class DashboardStore:
         self.assembly_inputs = {}
         self.job_durations = {}
         self.events = {c: [] for c in EVENT_LOG_CATEGORIES}
+        self.orders_placed = 0
+        self.open_order = None
+        self.orders_fulfilled_engineer = 0
+        self.orders_fulfilled_gatherer = 0
+        self.treasury_coins = 0
+        self.simulation_config = None
         self._seen_ids.clear()
 
     def ingest(self, env: EventEnvelope) -> bool:
@@ -178,7 +203,9 @@ class DashboardStore:
         if is_expired_snapshot:
             self.run_generation = max(self.run_generation, env.run_generation)
             self.latest_sim_time_minutes = max(self.latest_sim_time_minutes, env.sim_time_minutes)
+            logger.info(f"Store: simulation run {self.run_id[:8] if self.run_id else ''} expired at {self.latest_sim_time_minutes}m")
         elif env.run_generation > self.run_generation:
+            logger.info(f"Store: advanced to run_generation {env.run_generation}")
             self.run_generation = env.run_generation
             self.latest_sim_time_minutes = env.sim_time_minutes
             self.gathering_completed = {r: 0 for r in RESOURCE_STATIONS}
@@ -190,6 +217,12 @@ class DashboardStore:
             self.assembly_inputs = {}
             self.job_durations = {}
             self.events = {c: [] for c in EVENT_LOG_CATEGORIES}
+            self.orders_placed = 0
+            self.open_order = None
+            self.orders_fulfilled_engineer = 0
+            self.orders_fulfilled_gatherer = 0
+            self.treasury_coins = 0
+            self.simulation_config = None
         elif env.sim_time_minutes > self.latest_sim_time_minutes:
             self.latest_sim_time_minutes = env.sim_time_minutes
         self._last_event_mono = time.monotonic()
@@ -206,8 +239,11 @@ class DashboardStore:
             del log[EVENT_LOG_LIMIT:]
 
         if et == "simulation.state":
+            prev_status = self.lifecycle_status
             self.lifecycle_status = p.get("lifecycle_status", self.lifecycle_status)
             self.running = p.get("running", self.running)
+            if prev_status != self.lifecycle_status:
+                logger.info(f"Store: lifecycle_status changed '{prev_status}' -> '{self.lifecycle_status}'")
             # When the server is in debug mode it embeds ground-truth inventory
             # directly in the simulation.state payload so the attendee screen can
             # show it without waiting for a Flink hive_inventory_balances topic.
@@ -299,7 +335,32 @@ class DashboardStore:
                 self.assembly_blocked[sid] = missing
             return True
 
-        # simulation.initialized, etc. — still counted as activity
+        if et == "simulation.initialized":
+            cfg = p.get("simulation_config")
+            if isinstance(cfg, dict):
+                self.simulation_config = cfg
+            return True
+
+        if et == "order.placed":
+            self.orders_placed += 1
+            self.open_order = {
+                "order_id": p.get("order_id"),
+                "quantity_engineer": p.get("quantity_engineer", 0),
+                "quantity_gatherer": p.get("quantity_gatherer", 0),
+            }
+            return True
+
+        if et == "order.fulfilled":
+            if self.open_order and self.open_order.get("order_id") == p.get("order_id"):
+                self.open_order = None
+            q_eng = p.get("quantity_engineer", 0)
+            q_for = p.get("quantity_gatherer", 0)
+            self.orders_fulfilled_engineer += q_eng
+            self.orders_fulfilled_gatherer += q_for
+            self.treasury_coins += p.get("coins_received", 0)
+            return True
+
+        # simulation.state (non-order), etc. — still counted as activity
         return True
 
     def ingest_calculated_value(self, subject: str, elapsed_sim_minutes: int) -> bool:
@@ -330,7 +391,7 @@ class DashboardStore:
         if self._last_event_mono == 0.0:
             return "awaiting_events"
         age = time.monotonic() - self._last_event_mono
-        return "live" if age <= 3.0 else "stale"
+        return "live" if age <= 8.0 else "stale"
 
     def snapshot(self) -> Dict[str, Any]:
         return {
@@ -359,6 +420,13 @@ class DashboardStore:
             "event_topics_missing": list(self.event_topics_missing),
             "hive_job_durations_ready": self.hive_job_durations_ready,
             "hive_inventory_balances_ready": self.hive_inventory_balances_ready,
+            "simulation_config": self.simulation_config,
+            "orders_placed": self.orders_placed,
+            "open_order": dict(self.open_order) if self.open_order else None,
+            "orders_fulfilled_engineer": self.orders_fulfilled_engineer,
+            "orders_fulfilled_gatherer": self.orders_fulfilled_gatherer,
+            "treasury_coins": self.treasury_coins,
+            "order_topics_ready": self.order_topics_ready,
             "connection_status": self.connection_status,
             "connection_issues": [dict(i) for i in self.connection_issues],
         }

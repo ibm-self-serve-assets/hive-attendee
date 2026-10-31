@@ -52,10 +52,12 @@ Via Homebrew (recommended):
 ```bash
 brew install confluentinc/tap/cli
 ```
-Or via curl:
+No Homebrew or no admin rights? Install to your home directory instead (avoids `/usr/local/bin` permission errors):
 ```bash
-curl -sL --http1.1 https://cnfl.io/cli | sh -s -- -b /usr/local/bin
+curl -sL --http1.1 https://cnfl.io/cli | sh -s -- -b $HOME/.local/bin
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 ```
+> Using bash instead of zsh? Use `~/.bash_profile` in place of `~/.zshrc`. Check your shell with `echo $SHELL`.
 
 ### Windows
 
@@ -140,7 +142,9 @@ echo $env:ENV_ID/$env:CLUSTER_ID/$env:POOL_ID
 
 ## Step 3 — Create the Inventory Sink Table
 
-Run `01_create_sink.sql` once. This creates the `hive_inventory_balances` table in Flink and the backing Kafka topic with upsert changelog mode.
+**NOTE:** To run the following commands, ensure your Terminal window is in the Level 3 directory.
+
+Create the `hive_inventory_balances` table in Flink and the backing Kafka topic with upsert changelog mode. 
 
 ```bash
 confluent flink statement create hive-inventory-sink \
