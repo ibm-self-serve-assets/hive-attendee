@@ -2,22 +2,18 @@
 Single source of truth for Kafka topic names.
 
 Topic names are derived directly from the ``topics`` keys in
-``schemas/event_payloads_base.json`` (Levels 1-3) and
-``schemas/event_payloads_orders.json`` (Level 4) by replacing ``.`` with ``-``.
+``schemas/event_payloads_base.json`` by replacing ``.`` with ``-``.
 
 Consumers of this module use:
 
-    from topics import TOPICS, BASE_TOPICS, ORDER_TOPICS, ACTIVITY_TOPIC_SUFFIXES
+    from topics import TOPICS, BASE_TOPICS, ACTIVITY_TOPIC_SUFFIXES
 
-    BASE_TOPICS     – dict mapping suffix → topic name for the Level 1 topics
+    BASE_TOPICS     – dict mapping suffix → topic name
                       e.g. ".gathering-started" → "gathering-started"
 
-    ORDER_TOPICS    – same, for the Level 4 order topics. These are optional:
-                      attendees only create them when they reach Level 4.
+    TOPICS          – alias for BASE_TOPICS (used for publishing).
 
-    TOPICS          – BASE_TOPICS and ORDER_TOPICS combined (used for publishing).
-
-    ACTIVITY_TOPIC_SUFFIXES – list of suffixes for every *base* topic except
+    ACTIVITY_TOPIC_SUFFIXES – list of suffixes for every topic except
                       ".simulation-state" (used for probe writes).
 """
 
@@ -38,9 +34,8 @@ def _load(filename: str) -> Dict[str, str]:
 
 
 BASE_TOPICS: Dict[str, str] = _load("event_payloads_base.json")
-ORDER_TOPICS: Dict[str, str] = _load("event_payloads_orders.json")
 
-TOPICS: Dict[str, str] = {**BASE_TOPICS, **ORDER_TOPICS}
+TOPICS: Dict[str, str] = BASE_TOPICS
 
 ACTIVITY_TOPIC_SUFFIXES: List[str] = [
     suffix for suffix in BASE_TOPICS if suffix != ".simulation-state"

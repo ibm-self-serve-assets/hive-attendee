@@ -114,9 +114,10 @@ Skip this step if you already have a `hive_dev` environment with a Kafka cluster
 
 <img src="screenshots/confluent_create_environment.png" />
 
-6. Create a Kafka cluster named `hive_cluster`. Select **Basic** on the far-right as this is the least expensive option. 
-7. Scroll down then select **Google Cloud** and region `Oregon (us-west1)`.
-8. Click **Launch cluster**.
+6. Create a Kafka cluster named `hive_cluster`. 
+7. Select **Basic** on the far-right as this is the **least expensive** option. 
+8. Scroll down then select **Google Cloud** and region `Oregon (us-west1)`.
+9. Click **Launch cluster**.
 
 <img src="screenshots/confluent_create_cluster.png" />
 
@@ -158,21 +159,17 @@ The backend and topic provisioning scripts read configuration from `spec-shared/
 
 4. Go to your [Confluent Cloud home page](https://confluent.cloud/), open the right-side navigation panel then select **Accounts and access**.
  
-<img src="screenshots/right_side_user_account.png" width="50%" />
+<img src="screenshots/right_side_user_account.png" width="40%" />
 
-5. Click on your account name .
-
-<img src="screenshots/select_user_account.png" />
-
-6. Select **API keys** tab then click the **Add API key**.
+5. Select **API keys** tab then click the **Add API key**.
 
 <img src="screenshots/user_account.png"/>
 
-7. Enter **Name** as `hive_workshop`, skip **Description**, open the **Select key scope** dropdown and choose `Kafka cluster`, choose **Environments** as `hive_dev` and **Cluster** as `hive_cluster`
+6. Enter **Name** as `hive_workshop`, skip **Description**, open the **Select key scope** dropdown and choose `Kafka cluster`, choose **Environments** as `hive_dev` and **Cluster** as `hive_cluster`
 
 <img src="screenshots/api_key.png" />
 
-8. Click **Create API key** and copy the key and into [spec-shared/.env](../spec-shared/.env) because Confluent only shows it once.
+7. Click **Create API key** and copy the key and secret into [spec-shared/.env](../spec-shared/.env) because Confluent only shows it once.
 
 ```ini
 CONFLUENT_API_KEY=your-api-key
@@ -188,7 +185,7 @@ CONFLUENT_BOOTSTRAP_SERVER=pkc-xxxxx.us-west-2.aws.confluent.cloud:9092
 CONFLUENT_REST_ENDPOINT=https://pkc-xxxxx.us-west-2.aws.confluent.cloud
 CONFLUENT_CLUSTER_ID=lkc-xxxxxx
 ```
-6. Save [spec-shared/.env](../spec-shared/.env).
+9. Save [spec-shared/.env](../spec-shared/.env).
 
 ---
 
@@ -202,8 +199,6 @@ From the repository root, run:
 cd level-1-environment-setup/scripts
 ./provision_topics.sh
 ```
-
-To preview the topic names without calling Confluent, run `./provision_topics.sh --dry-run`.
 
 The script creates its own Python virtual environment, installs what it needs, and then creates one topic per event type. You should see a line like `✓ Created  gathering-started` for each topic. It is safe to run more than once: topics that already exist are reported as `~ Exists` and left unchanged.
 
@@ -335,6 +330,9 @@ Click on any event to view full details.  In the next levels, you will learn to 
 
 <img src="screenshots/manufacturing_started_details.png" />
 
+If you let the simulation run long enough, you'll see robots being assembled. For now though, proceed to the next steps and don't wait.  You'll be able to see your robots built in more detail within Level 2.
+
+<img src="screenshots/robot_assembly.png" />
 
 ### Validation & Acceptance Criteria
 

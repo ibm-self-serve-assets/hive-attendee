@@ -21,9 +21,6 @@ except ImportError:
     KAFKA_AVAILABLE = False
 
 
-ORDER_TOPIC_NAMES = ["order-placed", "order-fulfilled"]
-
-
 def _make_group_id(prefix: str, store: DashboardStore) -> str:
     sim_id_short = (store.active_simulation_id or "default")[:8]
     attendee_short = (store.attendee_id or "attendee").split("@")[0].replace(".", "-")[:16]
@@ -95,31 +92,16 @@ class EventConsumerManager:
             "enable.auto.commit": True,
         }
         self._kafka_consumer = ConfluentConsumer(conf, logger=kafka_logger)
-        self._kafka_consumer.subscribe(self.topics, on_assign=self._on_assign)
-        subscribed_orders = False
+        self._kafka_consumer.subscribe(self.topics)
         topic_counts: dict = {}
         last_summary = time.monotonic()
 
         while self._running:
             try:
-                # Level 4 order topics are created by the attendee later and the Simulation
-                # server's topic map may not list them; subscribe once they exist.
-                if not subscribed_orders and self.store.order_topics_ready:
-                    all_topics = list(dict.fromkeys(self.topics + ORDER_TOPIC_NAMES))
-                    self._kafka_consumer.subscribe(all_topics, on_assign=self._on_assign)
-                    subscribed_orders = True
-
-                # Every 30s, record how many records arrived per topic. A missing order topic
-                # here means nothing was published to (or delivered from) it.
                 now = time.monotonic()
                 if now - last_summary >= 30.0:
                     last_summary = now
-                    logger.info(
-                        f"Consumer summary (last 30s, records per topic): {topic_counts or 'none'}; "
-                        f"order_topics_ready={self.store.order_topics_ready}, "
-                        f"orders_placed={self.store.orders_placed}, "
-                        f"fulfilled eng/for={self.store.orders_fulfilled_engineer}/{self.store.orders_fulfilled_gatherer}"
-                    )
+                    logger.info(f"Consumer summary (last 30s, records per topic): {topic_counts or 'none'}")
                     topic_counts = {}
 
                 msgs = await asyncio.to_thread(self._kafka_consumer.consume, 200, 0.2)
@@ -133,7 +115,6 @@ class EventConsumerManager:
                         continue
 
                     topic_counts[msg.topic()] = topic_counts.get(msg.topic(), 0) + 1
-                    is_order_topic = msg.topic() in ORDER_TOPIC_NAMES
 
                     try:
                         raw_val = msg.value().decode("utf-8")
@@ -142,9 +123,7 @@ class EventConsumerManager:
                         if not env.event_type and msg.topic():
                             env.event_type = msg.topic().replace("-", ".")
                     except Exception as parse_err:
-                        # Order records are rare and important: surface parse failures.
-                        log = logger.warning if is_order_topic else logger.debug
-                        log(f"Skipping malformed or unparseable record on {msg.topic()}: {parse_err}")
+                        logger.debug(f"Skipping malformed or unparseable record on {msg.topic()}: {parse_err}")
                         continue
 
                     if env.event_type == "connection.test":

@@ -17,7 +17,7 @@ from backend.config import BackendConfig
 from backend.log_setup import LOG_FILE, MAJOR
 from backend.store import DashboardStore
 from backend.consumer import EventConsumerManager, CalculatedValuesConsumer, InventoryBalancesConsumer
-from backend.topic_watch import CalculatedValuesWatcher, InventoryBalancesWatcher, EventTopicsWatcher, OrderTopicsWatcher
+from backend.topic_watch import CalculatedValuesWatcher, InventoryBalancesWatcher, EventTopicsWatcher
 
 logger = logging.getLogger("hive.backend")
 
@@ -29,7 +29,6 @@ hive_job_durations_watcher: Optional[CalculatedValuesWatcher] = None
 hive_job_durations_consumer: Optional[CalculatedValuesConsumer] = None
 hive_inventory_balances_watcher: Optional[InventoryBalancesWatcher] = None
 hive_inventory_balances_consumer: Optional[InventoryBalancesConsumer] = None
-order_topics_watcher: Optional[OrderTopicsWatcher] = None
 subscribers: List[asyncio.Queue] = []
 
 
@@ -46,8 +45,7 @@ async def notify_subscribers(snap: Dict[str, Any]):
 async def lifespan(app: FastAPI):
     global consumer_mgr, event_topics_watcher, \
         hive_job_durations_watcher, hive_job_durations_consumer, \
-        hive_inventory_balances_watcher, hive_inventory_balances_consumer, \
-        order_topics_watcher
+        hive_inventory_balances_watcher, hive_inventory_balances_consumer
     store.attendee_id = config.attendee_id
     logger.info(
         f"Console shows only major events and errors. Full logs: {LOG_FILE}",
@@ -111,15 +109,6 @@ async def lifespan(app: FastAPI):
     )
     hive_inventory_balances_consumer.start()
 
-    order_topics_watcher = OrderTopicsWatcher(
-        store=store,
-        bootstrap_servers=config.confluent_bootstrap_server,
-        api_key=config.confluent_api_key,
-        api_secret=config.confluent_api_secret,
-        on_change=_notify_state,
-    )
-    order_topics_watcher.start()
-
     asyncio.create_task(auto_connect())
     yield
     event_topics_watcher.stop()
@@ -130,8 +119,6 @@ async def lifespan(app: FastAPI):
         hive_inventory_balances_watcher.stop()
     if hive_inventory_balances_consumer:
         hive_inventory_balances_consumer.stop()
-    if order_topics_watcher:
-        order_topics_watcher.stop()
     if consumer_mgr:
         consumer_mgr.stop()
 

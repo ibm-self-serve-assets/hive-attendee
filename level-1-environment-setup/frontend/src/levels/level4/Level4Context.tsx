@@ -55,8 +55,6 @@ export interface StationSlot {
 
 interface Level4ContextValue {
   stationSlots: Record<string, StationSlot[]>;
-  spentCoins: number;
-  coins: number;
   addStationCost: number;
   maxStations: number;
   tierCosts: Record<number, { cost_purchase: number; cost_upgrade: number; interval_sim_minutes: number }>;
@@ -82,16 +80,11 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
   }, [cfg]);
 
   const [stationSlots, setStationSlots] = useState<Record<string, StationSlot[]>>(initialStationSlots);
-  const [spentCoins, setSpentCoins] = useState<number>(0);
 
   // Reset on new run_id or when config first arrives
   useEffect(() => {
     setStationSlots(initialStationSlots);
-    setSpentCoins(0);
   }, [state.run_id, initialStationSlots]);
-
-  // Coins: authoritative sum from order.fulfilled events minus locally spent coins
-  const coins = Math.max(0, state.treasury_coins - spentCoins);
 
   const costMap = tierCostMap(cfg);
   const addCost = addStationCost(cfg);
@@ -99,11 +92,9 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
   const configReady = cfg !== null;
 
   const addStation = (key: string) => {
-    if (coins < addCost) return;
     setStationSlots((prev) => {
       const current = prev[key] ?? [{ id: 1, tier: 1 }];
       if (current.length >= maxSlotsCount) return prev;
-      setSpentCoins((s) => s + addCost);
       return {
         ...prev,
         [key]: [...current, { id: current.length + 1, tier: 1 }],
@@ -116,9 +107,8 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
     const st = current[index];
     if (!st || st.tier >= 3) return;
     const cost = costMap[st.tier]?.cost_upgrade ?? 250;
-    if (cost === -1 || coins < cost) return;
+    if (cost === -1) return;
 
-    setSpentCoins((s) => s + cost);
     setStationSlots((prev) => ({
       ...prev,
       [key]: (prev[key] ?? current).map((sItem, i) =>
@@ -131,8 +121,6 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
     <Level4Context.Provider
       value={{
         stationSlots,
-        spentCoins,
-        coins,
         addStationCost: addCost,
         maxStations: maxSlotsCount,
         tierCosts: costMap,

@@ -250,8 +250,7 @@
         "parts",
         "stations",
         "completed_robots",
-        "last_applied_command_id",
-        "treasury_coins"
+        "last_applied_command_id"
       ],
       "properties": {
         "lifecycle_status": {
@@ -382,11 +381,6 @@
         "last_applied_command_id": {
           "type": ["string", "null"],
           "format": "uuid"
-        },
-        "treasury_coins": {
-          "description": "Cumulative coins earned from fulfilled orders this run.",
-          "type": "integer",
-          "minimum": 0
         },
         "debug_mode_instructor_only": {
           "description": "Ground-truth inventory snapshot injected when the server is in debug mode. Null when debug mode is off. DO NOT use this field in attendee views — it is absent in normal runs.",

@@ -76,7 +76,7 @@ const AddStationHexagon: React.FC<{ onClick?: () => void; disabled?: boolean; si
       onClick={disabled ? undefined : onClick}
       className={`relative select-none flex-none ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer group'}`}
       style={{ width: size, height }}
-      title={disabled ? 'Not enough coins' : 'Add workstation (max 3)'}
+      title="Add workstation (max 3)"
     >
       <svg
         viewBox="0 0 100 115"
@@ -158,14 +158,10 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
   const level4 = useLevel4();
   const stationSlots = level4?.stationSlots ?? {};
-  const coins = level4?.coins ?? 0;
   const tierCosts = level4?.tierCosts ?? {};
-  const addCost = level4?.addStationCost ?? 1000;
   const maxStations = level4?.maxStations ?? 3;
   const addStation = level4?.addStation ?? (() => {});
   const upgradeStation = level4?.upgradeStation ?? (() => {});
-
-  const canAffordAdd = coins >= addCost;
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -207,7 +203,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         {slots.map((st, idx) => {
                           const cost = tierCosts[st.tier]?.cost_upgrade ?? 250;
                           const isMax = st.tier >= 3 || cost === -1;
-                          const canAfford = !isMax && coins >= cost;
                           const durationText = dur != null ? `${dur} mins` : `${tierCosts[st.tier]?.interval_sim_minutes ?? 10} mins`;
 
                           return (
@@ -232,25 +227,9 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                               ) : (
                                 <button
                                   onClick={() => upgradeStation(id, idx)}
-                                  disabled={!canAfford}
-                                  className={`rounded-md font-bold text-xs flex items-center justify-center gap-1 py-1 px-1.5 transition w-full shadow-sm select-none ${
-                                    canAfford
-                                      ? 'bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer'
-                                      : 'bg-[#E2E8F4] text-[#8C9BAE] cursor-not-allowed'
-                                  }`}
+                                  className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
                                 >
-                                  <span>{cost}</span>
-                                  <img
-                                    src="/icons/svg/coin.svg"
-                                    width={13}
-                                    height={13}
-                                    alt="coin"
-                                    style={{
-                                      objectFit: 'contain',
-                                      filter: canAfford ? 'none' : 'grayscale(1)',
-                                      opacity: canAfford ? 1 : 0.6,
-                                    }}
-                                  />
+                                  Upgrade
                                 </button>
                               )}
                             </div>
@@ -261,36 +240,16 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
-                              disabled={!canAffordAdd}
                               size={50}
                             />
-                            <span
-                              className="text-xs font-semibold leading-tight text-center whitespace-nowrap"
-                              style={{ color: canAffordAdd ? '#57606A' : '#8C9BAE' }}
-                            >
+                            <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
                               Add station
                             </span>
                             <button
                               onClick={() => addStation(id)}
-                              disabled={!canAffordAdd}
-                              className={`rounded-md font-bold text-xs flex items-center justify-center gap-1 py-1 px-1.5 transition w-full shadow-sm select-none ${
-                                canAffordAdd
-                                  ? 'bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer'
-                                  : 'bg-[#E2E8F4] text-[#8C9BAE] cursor-not-allowed'
-                              }`}
+                              className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
                             >
-                              <span>{addCost}</span>
-                              <img
-                                src="/icons/svg/coin.svg"
-                                width={13}
-                                height={13}
-                                alt="coin"
-                                style={{
-                                  objectFit: 'contain',
-                                  filter: canAffordAdd ? 'none' : 'grayscale(1)',
-                                  opacity: canAffordAdd ? 1 : 0.6,
-                                }}
-                              />
+                              Add
                             </button>
                           </div>
                         )}
@@ -343,7 +302,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         {slots.map((st, idx) => {
                           const cost = tierCosts[st.tier]?.cost_upgrade ?? 250;
                           const isMax = st.tier >= 3 || cost === -1;
-                          const canAfford = !isMax && coins >= cost;
                           const durationText = dur != null ? `${dur} mins` : `${tierCosts[st.tier]?.interval_sim_minutes ?? 10} mins`;
 
                           return (
@@ -368,25 +326,9 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                               ) : (
                                 <button
                                   onClick={() => upgradeStation(id, idx)}
-                                  disabled={!canAfford}
-                                  className={`rounded-md font-bold text-xs flex items-center justify-center gap-1 py-1 px-1.5 transition w-full shadow-sm select-none ${
-                                    canAfford
-                                      ? 'bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer'
-                                      : 'bg-[#E2E8F4] text-[#8C9BAE] cursor-not-allowed'
-                                  }`}
+                                  className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
                                 >
-                                  <span>{cost}</span>
-                                  <img
-                                    src="/icons/svg/coin.svg"
-                                    width={13}
-                                    height={13}
-                                    alt="coin"
-                                    style={{
-                                      objectFit: 'contain',
-                                      filter: canAfford ? 'none' : 'grayscale(1)',
-                                      opacity: canAfford ? 1 : 0.6,
-                                    }}
-                                  />
+                                  Upgrade
                                 </button>
                               )}
                             </div>
@@ -397,36 +339,16 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
-                              disabled={!canAffordAdd}
                               size={50}
                             />
-                            <span
-                              className="text-xs font-semibold leading-tight text-center whitespace-nowrap"
-                              style={{ color: canAffordAdd ? '#57606A' : '#8C9BAE' }}
-                            >
+                            <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
                               Add station
                             </span>
                             <button
                               onClick={() => addStation(id)}
-                              disabled={!canAffordAdd}
-                              className={`rounded-md font-bold text-xs flex items-center justify-center gap-1 py-1 px-1.5 transition w-full shadow-sm select-none ${
-                                canAffordAdd
-                                  ? 'bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer'
-                                  : 'bg-[#E2E8F4] text-[#8C9BAE] cursor-not-allowed'
-                              }`}
+                              className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
                             >
-                              <span>{addCost}</span>
-                              <img
-                                src="/icons/svg/coin.svg"
-                                width={13}
-                                height={13}
-                                alt="coin"
-                                style={{
-                                  objectFit: 'contain',
-                                  filter: canAffordAdd ? 'none' : 'grayscale(1)',
-                                  opacity: canAffordAdd ? 1 : 0.6,
-                                }}
-                              />
+                              Add
                             </button>
                           </div>
                         )}
@@ -480,7 +402,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         {slots.map((st, idx) => {
                           const cost = tierCosts[st.tier]?.cost_upgrade ?? 250;
                           const isMax = st.tier >= 3 || cost === -1;
-                          const canAfford = !isMax && coins >= cost;
                           const durationText = dur != null ? `${dur} mins` : `${tierCosts[st.tier]?.interval_sim_minutes ?? 10} mins`;
 
                           return (
@@ -505,25 +426,9 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                               ) : (
                                 <button
                                   onClick={() => upgradeStation(station_id, idx)}
-                                  disabled={!canAfford}
-                                  className={`rounded-md font-bold text-xs flex items-center justify-center gap-1 py-1 px-1.5 transition w-full shadow-sm select-none ${
-                                    canAfford
-                                      ? 'bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer'
-                                      : 'bg-[#E2E8F4] text-[#8C9BAE] cursor-not-allowed'
-                                  }`}
+                                  className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
                                 >
-                                  <span>{cost}</span>
-                                  <img
-                                    src="/icons/svg/coin.svg"
-                                    width={13}
-                                    height={13}
-                                    alt="coin"
-                                    style={{
-                                      objectFit: 'contain',
-                                      filter: canAfford ? 'none' : 'grayscale(1)',
-                                      opacity: canAfford ? 1 : 0.6,
-                                    }}
-                                  />
+                                  Upgrade
                                 </button>
                               )}
                             </div>
@@ -534,36 +439,16 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(station_id)}
-                              disabled={!canAffordAdd}
                               size={50}
                             />
-                            <span
-                              className="text-xs font-semibold leading-tight text-center whitespace-nowrap"
-                              style={{ color: canAffordAdd ? '#57606A' : '#8C9BAE' }}
-                            >
+                            <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
                               Add station
                             </span>
                             <button
                               onClick={() => addStation(station_id)}
-                              disabled={!canAffordAdd}
-                              className={`rounded-md font-bold text-xs flex items-center justify-center gap-1 py-1 px-1.5 transition w-full shadow-sm select-none ${
-                                canAffordAdd
-                                  ? 'bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer'
-                                  : 'bg-[#E2E8F4] text-[#8C9BAE] cursor-not-allowed'
-                              }`}
+                              className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
                             >
-                              <span>{addCost}</span>
-                              <img
-                                src="/icons/svg/coin.svg"
-                                width={13}
-                                height={13}
-                                alt="coin"
-                                style={{
-                                  objectFit: 'contain',
-                                  filter: canAffordAdd ? 'none' : 'grayscale(1)',
-                                  opacity: canAffordAdd ? 1 : 0.6,
-                                }}
-                              />
+                              Add
                             </button>
                           </div>
                         )}

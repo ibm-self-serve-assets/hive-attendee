@@ -86,11 +86,13 @@ confluent login --save
 
 # List environments and select yours
 confluent environment list
+
 # <ENV_ID> looks like env-abc123
 confluent environment use <ENV_ID>
 
 # List Kafka clusters and select yours
 confluent kafka cluster list
+
 # <CLUSTER_ID> looks like lkc-xyz789
 confluent kafka cluster use <CLUSTER_ID>
 
@@ -105,7 +107,7 @@ confluent flink compute-pool use <POOL_ID>
 confluent flink region use --cloud gcp --region <REGION>
 
 # Then select the matching Flink endpoint (run this AFTER the region command)
-confluent flink endpoint use "https://flink.<REGION>.gcp.confluent.cloud"
+confluent flink endpoint use https://flink.<REGION>.gcp.confluent.cloud
 ```
 
 Without the region, commands such as `confluent flink statement delete`, `list` and `describe` fail with `no cloud provider and region selected`. Without the endpoint, every Flink command prints `No Flink endpoint is specified, defaulting to public endpoint`. That notice is harmless, but setting the endpoint removes it. Changing the region unsets the endpoint, so always run the region command first.
@@ -121,7 +123,7 @@ export CLUSTER_ID=<CLUSTER_ID>
 export POOL_ID=<COMPUTE_POOL_ID>
 ```
 
-Validate presence of your variables.  Ensure no extra spaces are present.
+Validate presence of your variables.
 ```bash
 echo $ENV_ID/$CLUSTER_ID/$POOL_ID
 ```
@@ -142,7 +144,7 @@ echo $env:ENV_ID/$env:CLUSTER_ID/$env:POOL_ID
 
 ## Step 3 — Create the Inventory Sink Table
 
-**NOTE:** To run the following commands, ensure your Terminal window is in the Level 3 directory.
+**NOTE:** Ensure your Terminal window is in the **Level 3 directory** when running the following commands.
 
 Create the `hive_inventory_balances` table in Flink and the backing Kafka topic with upsert changelog mode. 
 
@@ -179,15 +181,15 @@ confluent flink statement create hive-inventory-jobs \
   --sql "$(cat flink/02_run_jobs.sql)" > /dev/null
 ```
 
-Confirm it succeeded:
+This command may take a few seconds to complete.  Once it does, confirm it succeeded using this command:
 
 ```bash
 confluent flink statement describe hive-inventory-jobs -o json | grep -E '"(status|status_detail)"'
 ```
 
-**Expected result:** status `RUNNING`. Unlike the DDL above, this DML statement runs indefinitely — do not delete it. It starts as `PENDING` and can take a minute or two to reach `RUNNING`.  
+**Expected result:** It starts as `PENDING` and can take a minute or two to reach `RUNNING`. Execute the above command as needed until `RUNNING` is displayed.   
 
-Ensure status is `RUNNING` before proceeding further.
+Unlike the first DDL that you ran above, this DML statement runs indefinitely. 
 
 > **Understanding DDL vs. DML in Flink:**
 > - **DDL (Data Definition Language):** Commands like `CREATE TABLE` that define schemas, tables, and connectors. They run once, establish the metadata, and finish immediately with status `COMPLETED`.
@@ -225,9 +227,9 @@ You should see:
 - no negative numbers.
 - If you restarted the simulation, the table will show earlier runs too. Each run has its own `run_id`.
 
-**4. Open dashboard and select Level 3.** Your Dashboard has an Inventory that shows the same results as in the Flink Shell with a single, but major caveat.
+**4. Congratulations! Level 3 Achieved!!!**
 
-The Simulation dashboard updates in near real-time — typically within a second of a new value being written — while the Flink Shell lags by up to a minute. Both are reading from the same `hive_inventory_balances` Kafka topic, but with different isolation levels. The dashboard backend uses `read_uncommitted`, so it sees records the moment Flink writes them. The Flink Shell uses `read_committed` (the default), so it only sees records after Flink's checkpoint transaction commits — which happens on the checkpoint interval, roughly once per minute on Confluent Cloud. The "Last Refresh" timer in the shell is just the shell's own display refresh rate, not an indicator of when new data arrived.
+Open your Hive Dashboard and select **Level 3.** Your Dashboard will now display an Inventory showing the same results as in the Flink Shell.  The Dashboard updates in near real-time — typically within a second of a new value being written — while the Flink Shell lags by up to a minute. Both are reading from the same `hive_inventory_balances` Kafka topic, but with different isolation levels. The dashboard backend uses `read_uncommitted`, so it sees records the moment Flink writes them. The Flink Shell uses `read_committed` (the default), so it only sees records after Flink's checkpoint transaction commits — which happens on the checkpoint interval, roughly once per minute on Confluent Cloud. The "Last Refresh" timer in the shell is just the shell's own display refresh rate, not an indicator of when new data arrived.
 
 <img src="screenshots/inventory_in_ui.png"/>
 
@@ -291,13 +293,16 @@ Stream Lineage is built into Stream Governance (Essentials) and automatically tr
 ### How to Access Stream Lineage
 
 1. Open the [Confluent Cloud Console](https://confluent.cloud).
-2. Select your **`hive_dev`** environment.
-3. Click into your Kafka cluster (e.g. `hive_cluster`).
-4. In the left navigation menu under your cluster, click **Stream Lineage**.
+2. Ensure your **`hive_dev`** environment is selected from the navbar's **Environment** dropdown.
+3. Click **Clusters** in the navbar then click your `hive_cluster` tile.
+4. The navbar will change to show your Cluster options.
+4. Click the **Lineage** option in the navbar.
 
 <img src="screenshots/stream_lineage.png"/>
 
 ### Exploring the simulation Topics and Statements
+
+You can drag the Lineage graph around using your mouse.  Zoom in/out using the buttons at bottom-right.  Click on the various items noted below and spend time exploring the **Lineage** flow.  This will help you better understand how Flink is processing your input Topics and producing new output Topics in your event stream.
 
 - **Producer:** Topics flow from the Simulation producer and into the Flink Statements that you created. Click on the Topic icons in the Stream Lineage UI to trace events originating from the Simulation across raw topics such as `gathering-completed`, `manufacturing-started`, `manufacturing-completed`, `assembly-started`, and `assembly-completed`.
 - **Flink Statements:** Identify the Flink Statement nodes representing your running `hive-inventory-jobs` statement set (as well as Level 2's `hive_job_durations` joins).
