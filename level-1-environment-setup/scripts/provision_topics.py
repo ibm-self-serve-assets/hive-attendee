@@ -8,8 +8,9 @@ The Simulation server publishes events to these topics as your Simulation runs.
 Topics must exist before you call /v1/simulations — the server verifies them
 at registration time and will reject your request if any are missing.
 
-State topic (compact policy, infinite retention):
-simulation-state             — full Simulation snapshot (lifecycle, inventory, stations)
+State topics (compact policy, infinite retention):
+simulation-state             — Simulation lifecycle snapshot (lifecycle status, errors)
+assembly-state               — Assembly state snapshot (robot assembly order queue)
 
 WHY COMPACT FOR FACTORY-STATE?
   Log compaction keeps only the most recent message per key. This means your
@@ -81,12 +82,14 @@ STATE_CONFIG = {
     "retention.ms": "-1",   # -1 = no time-based deletion; compaction handles cleanup
 }
 
+STATE_TOPIC_KEYS = {"simulation.state", "assembly.state"}
+
 def _load_topics() -> List[Tuple[str, dict]]:
     """
     Derive topic names from spec-shared/schemas/event_payloads.json.
     Keys in ``topics`` use dot-notation (e.g. ``gathering.started``);
     topic names use hyphens (``gathering-started``).
-    ``simulation.state`` gets the compact/infinite-retention policy;
+    ``simulation.state`` and ``assembly.state`` get the compact/infinite-retention policy;
     all others get the delete/24 h policy.
     """
     with _SCHEMA_PATH.open() as fh:
@@ -94,7 +97,7 @@ def _load_topics() -> List[Tuple[str, dict]]:
     return [
         (
             key.replace(".", "-"),
-            STATE_CONFIG if key == "simulation.state" else ACTIVITY_CONFIG,
+            STATE_CONFIG if key in STATE_TOPIC_KEYS else ACTIVITY_CONFIG,
         )
         for key in schema["topics"]
     ]

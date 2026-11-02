@@ -1,7 +1,7 @@
 import React from 'react';
 import { EventPanel } from '../../components/EventPanel';
 import { FlowDots } from '../../components/FlowDots';
-import { StationStats } from '../../components/StationStats';
+import { HexagonTierBadge } from '../../components/HexagonTierBadge';
 import { AssemblyQueue } from '../../components/AssemblyQueue';
 import { useLevel4 } from '../level4/Level4Context';
 import type { LevelScreenProps } from '../types';
@@ -52,14 +52,30 @@ const InputChips: React.FC<{
   </span>
 );
 
+/** Tier hexagon with the job duration beneath it. No upgrade/add-station controls before Level 4. */
+const StationHexagon: React.FC<{
+  tier: number;
+  blocked: boolean;
+  durationText: string;
+  running: boolean;
+  tooltip: string;
+}> = ({ tier, blocked, durationText, running, tooltip }) => (
+  <div className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
+    <HexagonTierBadge tier={tier} blocked={blocked} active={running} tooltip={tooltip} size={50} />
+    <span
+      className="text-xs font-semibold leading-tight text-center whitespace-nowrap"
+      style={{ color: blocked ? '#D36B00' : '#57606A' }}
+    >
+      {blocked ? 'Parts unavailable' : durationText}
+    </span>
+  </div>
+);
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
   const {
     running,
-    gathering_completed,
-    manufacturing_completed,
-    assembly_completed,
     manufacturing_blocked,
     assembly_blocked,
     manufacturing_inputs,
@@ -73,6 +89,13 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
   const queue = robot_queue ?? [];
   const level4 = useLevel4();
   const removeFromQueue = level4?.removeFromQueue ?? (() => Promise.resolve());
+  const stationSlots = level4?.stationSlots ?? {};
+  const tierCosts = level4?.tierCosts ?? {};
+
+  /** Tier of a station's (single) workstation, and its duration label — same sources as Level 4. */
+  const stationTier = (stationId: string) => stationSlots[stationId]?.[0]?.tier ?? 1;
+  const durationLabel = (tier: number, dur?: number) =>
+    `${dur ?? tierCosts[tier]?.interval_sim_minutes ?? 10} mins`;
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -97,7 +120,6 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                 {GATHERING_ORDER.map((gid) => {
                   const res = RESOURCES.find(r => r.id === gid)!;
                   const { id, label, icon } = res;
-                  const count   = gathering_completed[id] ?? 0;
                   const blocked = false;
                   const dur     = job_durations[id];
                   return (
@@ -107,8 +129,9 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           style={{ objectFit: 'contain' }} />
                         <span className="text-xs font-semibold text-[#57606A]">{label}</span>
                       </div>
-                      <StationStats count={count} blocked={blocked} durationMins={dur} running={running}
-                        tooltip="Waiting for resources" ringSize={95} showCount={false} />
+                      <StationHexagon tier={stationTier(id)} blocked={blocked}
+                        durationText={durationLabel(stationTier(id), dur)} running={running}
+                        tooltip="Waiting for resources" />
                     </div>
                   );
                 })}
@@ -137,7 +160,6 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
               <h2 className="text-[#2850B8] font-bold text-base mb-1">Parts manufacturing</h2>
               <div className="flex flex-col gap-3">
                 {STATIONS.map(({ id, label, icon, output_type }) => {
-                  const count      = manufacturing_completed[id] ?? 0;
                   const blocked    = id in manufacturing_blocked;
                   const dur        = job_durations[id] ?? job_durations[output_type];
                   const inputs     = manufacturing_inputs[id] ?? {};
@@ -151,8 +173,9 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       <div className="flex items-center gap-4">
                         <img src={icon} width={55} height={55} alt={output_type}
                           style={{ objectFit: 'contain' }} />
-                        <StationStats count={count} blocked={blocked} durationMins={dur} running={running}
-                          tooltip="Waiting for resources" ringSize={85} showCount={false} />
+                        <StationHexagon tier={stationTier(id)} blocked={blocked}
+                          durationText={durationLabel(stationTier(id), dur)} running={running}
+                          tooltip="Waiting for resources" />
                       </div>
                     </div>
                   );
@@ -186,7 +209,6 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
               <h2 className="text-[#2850B8] font-bold text-base mb-1">Robot assembly</h2>
               <div className="flex flex-col gap-3">
                 {ROBOTS.map(({ id, station_id, label, icon }) => {
-                  const count      = assembly_completed[id] ?? 0;
                   const blocked    = station_id in assembly_blocked;
                   const dur        = job_durations[station_id] ?? job_durations[id];
                   const inputs     = assembly_inputs[station_id] ?? {};
@@ -199,8 +221,9 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       </div>
                       <div className="flex items-center gap-4">
                         <img src={icon} width={60} height={60} alt={label} style={{ objectFit: 'contain' }} />
-                        <StationStats count={count} blocked={blocked} durationMins={dur} running={running}
-                          tooltip="Waiting for parts" ringSize={90} showCount={false} />
+                        <StationHexagon tier={stationTier(station_id)} blocked={blocked}
+                          durationText={durationLabel(stationTier(station_id), dur)} running={running}
+                          tooltip="Waiting for parts" />
                       </div>
                     </div>
                   );

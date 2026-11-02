@@ -215,7 +215,7 @@ class DashboardStore:
         p = env.payload
 
         category = et.split(".", 1)[0]
-        if category in self.events:
+        if category in self.events and et != "assembly.state":
             log = self.events[category]
             log.insert(0, env.model_dump())
             del log[EVENT_LOG_LIMIT:]
@@ -228,18 +228,11 @@ class DashboardStore:
                 self.robot_queue = list(p["robot_queue"])
             if prev_status != self.lifecycle_status:
                 logger.info(f"Store: lifecycle_status changed '{prev_status}' -> '{self.lifecycle_status}'")
-            # When the server is in debug mode it embeds ground-truth inventory
-            # directly in the simulation.state payload so the attendee screen can
-            # show it without waiting for a Flink hive_inventory_balances topic.
-            debug_inv = p.get("debug_mode_instructor_only")
-            if debug_inv and isinstance(debug_inv, dict) and self.run_id:
-                run = self.inventory_by_run.setdefault(
-                    self.run_id, {"resource": {}, "part": {}, "robot": {}}
-                )
-                for itype in ("resource", "part", "robot"):
-                    vals = debug_inv.get(itype)
-                    if isinstance(vals, dict):
-                        run[itype] = dict(vals)
+            return True
+
+        if et == "assembly.state":
+            if "robot_queue" in p and isinstance(p["robot_queue"], list):
+                self.robot_queue = list(p["robot_queue"])
             return True
 
         if et == "gathering.started":

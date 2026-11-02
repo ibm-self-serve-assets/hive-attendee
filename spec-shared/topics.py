@@ -13,13 +13,16 @@ Consumers of this module use:
 
     TOPICS          – alias for BASE_TOPICS (used for publishing).
 
-    ACTIVITY_TOPIC_SUFFIXES – list of suffixes for every topic except
-                      ".simulation-state" (used for probe writes).
+    STATE_TOPIC_SUFFIXES    – set of suffixes for state snapshot topics
+                      (".simulation-state", ".assembly-state")
+
+    ACTIVITY_TOPIC_SUFFIXES – list of suffixes for every activity topic
+                      (used for probe writes).
 """
 
 import json
 import pathlib
-from typing import Dict, List
+from typing import Dict, List, Set
 
 _SCHEMA_DIR = pathlib.Path(__file__).parent / "schemas"
 
@@ -37,6 +40,8 @@ BASE_TOPICS: Dict[str, str] = _load("event_payloads_base.json")
 
 TOPICS: Dict[str, str] = BASE_TOPICS
 
+STATE_TOPIC_SUFFIXES: Set[str] = {".simulation-state", ".assembly-state"}
+
 ACTIVITY_TOPIC_SUFFIXES: List[str] = [
-    suffix for suffix in BASE_TOPICS if suffix != ".simulation-state"
+    suffix for suffix in BASE_TOPICS if suffix not in STATE_TOPIC_SUFFIXES
 ]

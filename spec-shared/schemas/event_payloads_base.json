@@ -239,169 +239,29 @@
       },
       "additionalProperties": false
     },
+    "assembly.state": {
+      "type": "object",
+      "required": ["robot_queue"],
+      "properties": {
+        "robot_queue": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
     "simulation.state": {
       "type": "object",
       "required": [
         "lifecycle_status",
-        "running",
-        "operational_error",
-        "resource_deliveries",
-        "resources",
-        "parts",
-        "stations",
-        "completed_robots",
-        "robot_queue",
-        "last_applied_command_id"
+        "running"
       ],
       "properties": {
         "lifecycle_status": {
           "type": "string",
           "enum": ["paused", "running", "stopped", "expired"]
         },
-        "running": { "type": "boolean" },
-        "operational_error": {
-          "oneOf": [
-            { "type": "null" },
-            {
-              "type": "object",
-              "required": ["code", "message"],
-              "properties": {
-                "code": { "type": "string" },
-                "message": { "type": "string" }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
-        "resource_deliveries": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": [
-              "name",
-              "interval_sim_ms",
-              "next_delivery_sim_time_ms",
-              "next_delivery_in_ms",
-              "quantity"
-            ],
-            "properties": {
-              "name": { "type": "string", "enum": ["resin", "silicon", "metals", "copper", "energy"] },
-              "interval_sim_ms": { "type": "integer", "minimum": 0 },
-              "next_delivery_sim_time_ms": { "type": "integer", "minimum": 0 },
-              "next_delivery_in_ms": { "type": "integer", "minimum": 0 },
-              "quantity": { "type": "integer", "minimum": 1 }
-            },
-            "additionalProperties": false
-          }
-        },
-        "resources": {
-          "type": "object",
-          "required": ["resin", "silicon", "metals", "copper", "energy"],
-          "properties": {
-            "resin": { "type": "integer", "minimum": 0 },
-            "silicon": { "type": "integer", "minimum": 0 },
-            "metals": { "type": "integer", "minimum": 0 },
-            "copper": { "type": "integer", "minimum": 0 },
-            "energy": { "type": "integer", "minimum": 0 }
-          },
-          "additionalProperties": false
-        },
-        "parts": {
-          "type": "object",
-          "required": ["chassis", "electronics", "actuator", "battery"],
-          "properties": {
-            "chassis": { "type": "integer", "minimum": 0 },
-            "electronics": { "type": "integer", "minimum": 0 },
-            "actuator": { "type": "integer", "minimum": 0 },
-            "battery": { "type": "integer", "minimum": 0 }
-          },
-          "additionalProperties": false
-        },
-        "stations": {
-          "type": "array",
-          "minItems": 6,
-          "maxItems": 7,
-          "items": {
-            "type": "object",
-            "required": ["station_id", "status", "missing_inputs", "job"],
-            "properties": {
-              "station_id": { "type": "string" },
-              "status": {
-                "type": "string",
-                "enum": ["idle", "working", "waiting_for_resources", "waiting_for_parts"]
-              },
-              "missing_inputs": {
-                "type": "object",
-                "additionalProperties": { "type": "integer", "minimum": 1 }
-              },
-              "job": {
-                "oneOf": [
-                  { "type": "null" },
-                  {
-                    "type": "object",
-                    "required": [
-                      "job_id",
-                      "output_type",
-                      "started_at_sim_ms",
-                      "completes_at_sim_ms",
-                      "consumed_inputs",
-                      "progress_percent"
-                    ],
-                    "properties": {
-                      "job_id": { "type": "string", "format": "uuid" },
-                      "output_type": { "type": "string" },
-                      "started_at_sim_ms": { "type": "integer", "minimum": 0 },
-                      "completes_at_sim_ms": { "type": "integer", "minimum": 0 },
-                      "consumed_inputs": { "type": "object" },
-                      "progress_percent": {
-                        "type": "number",
-                        "minimum": 0.0,
-                        "maximum": 100.0
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                ]
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "completed_robots": {
-          "type": "object",
-          "required": ["count", "last_robot_id"],
-          "properties": {
-            "count": { "type": "integer", "minimum": 0 },
-            "last_robot_id": {
-              "type": ["string", "null"],
-              "enum": ["engineer", "gatherer", "builder", null]
-            }
-          },
-          "additionalProperties": false
-        },
-        "robot_queue": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "last_applied_command_id": {
-          "type": ["string", "null"],
-          "format": "uuid"
-        },
-        "debug_mode_instructor_only": {
-          "description": "Ground-truth inventory snapshot injected when the server is in debug mode. Null when debug mode is off. DO NOT use this field in attendee views — it is absent in normal runs.",
-          "oneOf": [
-            { "type": "null" },
-            {
-              "type": "object",
-              "properties": {
-                "resource": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
-                "part":     { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
-                "robot":    { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
-              },
-              "additionalProperties": false
-            }
-          ]
-        }
+        "running": { "type": "boolean" }
       },
       "additionalProperties": false
     }

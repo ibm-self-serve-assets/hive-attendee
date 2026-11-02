@@ -321,9 +321,22 @@ Click on a **Flink Statement** node to view useful useful stats like `Messages i
 
 ## Explore the Level 3 Dashboard
 
+### Real-Time Inventory
 The Level 3 dashboard contains a real-time Inventory of available resources, parts and robots which is updated from your new `hive_inventory_balances` topic.  By observing the parts manufacturing events, you can see that `manufacturing-started` events coincide with the total resources being reduced by the required input amounts.  Likewise the parts inventory is seen to reduce when the `assembly-started` event appears, as expected.
 
 <img src="screenshots/inventory_in_ui.png"/>
+
+### Workstation Tiers 1-3 
+
+In Level 2, you discovered the workstations were gathering resources and manufacturing parts at different rates: 10 mins, 5 mins and 3 mins. To simplify the visual depiction for this rate of production, each workstation tier displays as a unique hexagon graphic:
+
+- Tier 1 = 1 chevron = 1 unit per 10 mins
+- Tier 2 = 2 chevrons = 1 unit per 5 mins
+- Tier 3 = 3 chevrons = 1 unit per 3 mins
+
+<img src="screenshots/workstation_tiers.png"/>
+
+### Required Inputs
 
 You will also see that each manufacturing and robot assembly stations now show their required inputs.  This value is obtained from the `manufacturing-started` and `assembly-started` events.
 
