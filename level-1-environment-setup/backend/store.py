@@ -27,16 +27,16 @@ RESOURCE_STATIONS = ["copper", "energy", "metals", "resin", "silicon"]
 
 # Parts manufacturing stations
 MANUFACTURING_STATIONS = [
-    "actuator_fabrication",
-    "battery_assembly",
-    "structural_molding",
-    "electronics_assembly",
+    "actuator",
+    "battery",
+    "chassis",
+    "electronics",
 ]
 
 # Assembly stations and their robot output
 ASSEMBLY_STATIONS = {
-    "worker_assembly": "engineer",
-    "gatherer_assembly": "gatherer",
+    "engineer": "engineer",
+    "gatherer": "gatherer",
 }
 
 # Recent raw events kept per dashboard section (newest first), keyed by event_type prefix.
@@ -64,6 +64,7 @@ class DashboardStore:
         # lifecycle — from simulation.state
         self.lifecycle_status: str = "paused"
         self.running: bool = False
+        self.robot_queue: List[str] = []
 
         # stream health tracking
         self._last_event_mono: float = 0.0
@@ -134,6 +135,7 @@ class DashboardStore:
         self.run_id = None
         self.lifecycle_status = "paused"
         self.running = False
+        self.robot_queue = []
         self.gathering_completed = {r: 0 for r in RESOURCE_STATIONS}
         self.manufacturing_completed = {s: 0 for s in MANUFACTURING_STATIONS}
         self.assembly_completed = {}
@@ -222,6 +224,8 @@ class DashboardStore:
             prev_status = self.lifecycle_status
             self.lifecycle_status = p.get("lifecycle_status", self.lifecycle_status)
             self.running = p.get("running", self.running)
+            if "robot_queue" in p and isinstance(p["robot_queue"], list):
+                self.robot_queue = list(p["robot_queue"])
             if prev_status != self.lifecycle_status:
                 logger.info(f"Store: lifecycle_status changed '{prev_status}' -> '{self.lifecycle_status}'")
             # When the server is in debug mode it embeds ground-truth inventory
@@ -364,6 +368,7 @@ class DashboardStore:
             "sim_time_minutes": self.latest_sim_time_minutes,
             "lifecycle_status": self.lifecycle_status,
             "running": self.running,
+            "robot_queue": list(self.robot_queue),
             "gathering_completed": dict(self.gathering_completed),
             "manufacturing_completed": dict(self.manufacturing_completed),
             "assembly_completed": dict(self.assembly_completed),

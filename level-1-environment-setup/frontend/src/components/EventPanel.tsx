@@ -169,10 +169,11 @@ const EventModal: React.FC<{ event: HiveEvent; onClose: () => void }> = ({ event
 interface EventPanelProps {
   title: string;
   events: HiveEvent[];
+  defaultOpen?: boolean;
 }
 
-export const EventPanel: React.FC<EventPanelProps> = ({ title, events }) => {
-  const [open, setOpen] = useState(true);
+export const EventPanel: React.FC<EventPanelProps> = ({ title, events, defaultOpen = true }) => {
+  const [open, setOpen] = useState(defaultOpen);
   const [selected, setSelected] = useState<HiveEvent | null>(null);
 
   return (

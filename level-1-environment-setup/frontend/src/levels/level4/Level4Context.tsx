@@ -11,9 +11,9 @@ const FALLBACK_TIER_COSTS: Record<number, { cost_purchase: number; cost_upgrade:
 
 const FALLBACK_INITIAL_TIERS: Record<string, number> = {
   copper: 2, energy: 3, metals: 1, resin: 2, silicon: 2,
-  structural_molding: 1, electronics_assembly: 1,
-  actuator_fabrication: 1, battery_assembly: 1,
-  worker_assembly: 1, gatherer_assembly: 1,
+  chassis: 1, electronics: 1,
+  actuator: 1, battery: 1,
+  engineer: 1, gatherer: 1,
 };
 
 const FALLBACK_MAX_SLOTS = 3;
@@ -61,6 +61,8 @@ interface Level4ContextValue {
   configReady: boolean;
   addStation: (key: string) => void;
   upgradeStation: (key: string, index: number) => void;
+  addToQueue: (robotType: string) => Promise<void>;
+  removeFromQueue: (index: number) => Promise<void>;
 }
 
 const Level4Context = createContext<Level4ContextValue | null>(null);
@@ -117,6 +119,28 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
     }));
   };
 
+  const addToQueue = async (robotType: string) => {
+    try {
+      await fetch('/api/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ robot_type: robotType }),
+      });
+    } catch (err) {
+      console.error('Failed to add robot to queue:', err);
+    }
+  };
+
+  const removeFromQueue = async (index: number) => {
+    try {
+      await fetch(`/api/queue/${index}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.error('Failed to remove robot from queue:', err);
+    }
+  };
+
   return (
     <Level4Context.Provider
       value={{
@@ -127,6 +151,8 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
         configReady,
         addStation,
         upgradeStation,
+        addToQueue,
+        removeFromQueue,
       }}
     >
       {children}

@@ -59,6 +59,7 @@ export interface DashboardState {
   sim_time_minutes: number;
   lifecycle_status: 'paused' | 'running' | 'stopped' | 'expired';
   running: boolean;
+  robot_queue?: string[];
 
   // Completed counts keyed by station_id / station_id / output_type
   gathering_completed: Record<string, number>;

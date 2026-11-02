@@ -89,10 +89,10 @@
         "station_id": {
           "type": "string",
           "enum": [
-            "structural_molding",
-            "electronics_assembly",
-            "actuator_fabrication",
-            "battery_assembly"
+            "chassis",
+            "electronics",
+            "actuator",
+            "battery"
           ]
         },
         "output_type": {
@@ -114,10 +114,10 @@
         "station_id": {
           "type": "string",
           "enum": [
-            "structural_molding",
-            "electronics_assembly",
-            "actuator_fabrication",
-            "battery_assembly"
+            "chassis",
+            "electronics",
+            "actuator",
+            "battery"
           ]
         },
         "part_id": {
@@ -135,10 +135,10 @@
         "station_id": {
           "type": "string",
           "enum": [
-            "structural_molding",
-            "electronics_assembly",
-            "actuator_fabrication",
-            "battery_assembly"
+            "chassis",
+            "electronics",
+            "actuator",
+            "battery"
           ]
         },
         "missing_inputs": {
@@ -156,10 +156,10 @@
         "station_id": {
           "type": "string",
           "enum": [
-            "structural_molding",
-            "electronics_assembly",
-            "actuator_fabrication",
-            "battery_assembly"
+            "chassis",
+            "electronics",
+            "actuator",
+            "battery"
           ]
         },
         "inputs_acquired": {
@@ -177,11 +177,11 @@
         "job_id": { "type": "string", "format": "uuid" },
         "station_id": {
           "type": "string",
-          "enum": ["worker_assembly", "gatherer_assembly"]
+          "enum": ["engineer", "gatherer", "builder"]
         },
         "output_type": {
           "type": "string",
-          "enum": ["engineer", "gatherer"]
+          "enum": ["engineer", "gatherer", "builder"]
         },
         "inputs": {
           "type": "object",
@@ -197,11 +197,11 @@
         "job_id": { "type": "string", "format": "uuid" },
         "station_id": {
           "type": "string",
-          "enum": ["worker_assembly", "gatherer_assembly"]
+          "enum": ["engineer", "gatherer", "builder"]
         },
         "output_type": {
           "type": "string",
-          "enum": ["engineer", "gatherer"]
+          "enum": ["engineer", "gatherer", "builder"]
         },
         "quantity": { "type": "integer", "const": 1 }
       },
@@ -213,7 +213,7 @@
       "properties": {
         "station_id": {
           "type": "string",
-          "enum": ["worker_assembly", "gatherer_assembly"]
+          "enum": ["engineer", "gatherer", "builder"]
         },
         "missing_inputs": {
           "type": "object",
@@ -229,7 +229,7 @@
       "properties": {
         "station_id": {
           "type": "string",
-          "enum": ["worker_assembly", "gatherer_assembly"]
+          "enum": ["engineer", "gatherer", "builder"]
         },
         "inputs_acquired": {
           "type": "object",
@@ -250,6 +250,7 @@
         "parts",
         "stations",
         "completed_robots",
+        "robot_queue",
         "last_applied_command_id"
       ],
       "properties": {
@@ -319,7 +320,7 @@
         "stations": {
           "type": "array",
           "minItems": 6,
-          "maxItems": 6,
+          "maxItems": 7,
           "items": {
             "type": "object",
             "required": ["station_id", "status", "missing_inputs", "job"],
@@ -373,10 +374,14 @@
             "count": { "type": "integer", "minimum": 0 },
             "last_robot_id": {
               "type": ["string", "null"],
-              "enum": ["engineer", "gatherer", null]
+              "enum": ["engineer", "gatherer", "builder", null]
             }
           },
           "additionalProperties": false
+        },
+        "robot_queue": {
+          "type": "array",
+          "items": { "type": "string" }
         },
         "last_applied_command_id": {
           "type": ["string", "null"],

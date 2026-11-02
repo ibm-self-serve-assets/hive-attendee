@@ -80,7 +80,7 @@ Each workstation in the **Manufacture parts** section provides the various parts
 3. Chassis
 4. Electronics
 
-And each workstation requires its own unique input of resources to generate a part.  In a later section, you will inspect the event within the Manufacturing stations to understand how many of each resource is typically required to manufacture that part.  For instance, the resources for **Actuator Fabrication** might be similar to
+And each workstation requires its own unique input of resources to generate a part.  In a later section, you will inspect the event within the Manufacturing stations to understand how many of each resource is typically required to manufacture that part.  For instance, the resources to fabricate an **Actuator** might be similar to
 
 - 1 Actuator  = 1 x energy + 2 metals + 1 copper
 

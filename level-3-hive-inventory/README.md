@@ -304,11 +304,18 @@ Stream Lineage is built into Stream Governance (Essentials) and automatically tr
 
 You can drag the Lineage graph around using your mouse.  Zoom in/out using the buttons at bottom-right.  Click on the various items noted below and spend time exploring the **Lineage** flow.  This will help you better understand how Flink is processing your input Topics and producing new output Topics in your event stream.
 
+- **Node & Stream Inspection:** Click on any topic or stream edge in the lineage graph to view real-time throughput metrics (records/sec, bytes/sec), active schemas registered in Schema Registry, partition distributions, and consumer lag.
 - **Producer:** Topics flow from the Simulation producer and into the Flink Statements that you created. Click on the Topic icons in the Stream Lineage UI to trace events originating from the Simulation across raw topics such as `gathering-completed`, `manufacturing-started`, `manufacturing-completed`, `assembly-started`, and `assembly-completed`.
 - **Flink Statements:** Identify the Flink Statement nodes representing your running `hive-inventory-jobs` statement set (as well as Level 2's `hive_job_durations` joins).
 - **Derived Sink Topic:** Observe the flow routing into the `hive_inventory_balances` (the upsert changelog table) and `hive_job_durations` topics.
-- **Downstream Consumers:** Locate the consumer application nodes representing your local Hive Dashboard backend service reading the live inventory balances and raw events.
-- **Node & Stream Inspection:** Click on any topic or stream edge in the lineage graph to view real-time throughput metrics (records/sec, bytes/sec), active schemas registered in Schema Registry, partition distributions, and consumer lag.
+
+<img src="screenshots/lineage_flink_statements.png"/>
+
+Click on a **Flink Statement** node to view useful useful stats like `Messages in per minute`In the table, `Activity` is useful to observe a breakdown of the messages by Topic plus select `SQL Content` to view the SQL executing in this Flink statement.
+
+- **Consumers Group:** Locate and click on the Consumer Group nodes representing your local Hive Dashboard backend service reading the live inventory balances and raw events.  In the table, you can view the total Bytes passing through your stream.  While we are not reviewing how to size your instance, detailed memory usage is valuable when sizing your Confluent Cloud Cluster and Compute Pool.
+
+<img src="screenshots/consumer_group.png"/>
 
 ---
 
@@ -324,7 +331,9 @@ You will also see that each manufacturing and robot assembly stations now show t
 
 ### Lavel 4: Order Fulfillment
 
-You may be asking yourself, what is the motivating force behind manufacturing these robots.  Surely someone placed an order for them, because while it might be nice to give robots away for free, your manufacturing workflow needs to generate revenue to afford workstation ugrades and even purchase more workstations as required.  Level 4 adds the concept of Order Fullfilment to address this need.
+You may be asking yourself, what is the motivating force behind manufacturing these robots?  Where is the Queen that is managing the Hive?  Surely that Queen has placed order for them based on some prioritization.  Wouldn't a Queen need to assign workers to improve resource gathering to remove bottlenecks and can workstations be upgraded in some manner?
+
+Level 4 introduces the concept of Order Fullfilment. You will use Flink to compute the back-propogation logic that connects incoming robot orders to prioritization of parts manufacturing.  Workstation upgrades and the ability to build new workstations gets you closer to handing over Hive management to the Queen, or your AI coding assistant.
 
 ## Next Step
 

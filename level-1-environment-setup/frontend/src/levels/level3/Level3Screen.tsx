@@ -2,6 +2,8 @@ import React from 'react';
 import { EventPanel } from '../../components/EventPanel';
 import { FlowDots } from '../../components/FlowDots';
 import { StationStats } from '../../components/StationStats';
+import { AssemblyQueue } from '../../components/AssemblyQueue';
+import { useLevel4 } from '../level4/Level4Context';
 import type { LevelScreenProps } from '../types';
 
 import {
@@ -65,7 +67,12 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
     job_durations,
     inventory,
     events,
+    robot_queue,
   } = state;
+
+  const queue = robot_queue ?? [];
+  const level4 = useLevel4();
+  const removeFromQueue = level4?.removeFromQueue ?? (() => Promise.resolve());
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -74,8 +81,8 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
         {/* ── Column 1: Resource gathering ──────────────────────────────── */}
         <div className="flex-[4] flex flex-col gap-4 min-w-0">
           {/* Inventory */}
-          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-4">
-            <h2 className="text-[#2850B8] font-bold text-sm mb-3">Resource inventory</h2>
+          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-2">
+            <h2 className="text-[#2850B8] font-bold text-sm mb-1">Resource inventory</h2>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               {RESOURCES.map(({ id, label, icon }) => (
                 <InventoryItem key={id} icon={icon} label={label} qty={inventory.resource[id] ?? 0} />
@@ -84,8 +91,8 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
           </div>
           {/* Floor */}
           <section>
-            <div className="rounded-xl border border-[#E0E8F8] bg-white p-5" style={{ minHeight: 480 }}>
-              <h2 className="text-[#2850B8] font-bold text-base mb-4">Resource gathering</h2>
+            <div className="rounded-xl border border-[#E0E8F8] bg-white p-3" style={{ minHeight: 480 }}>
+              <h2 className="text-[#2850B8] font-bold text-base mb-1">Resource gathering</h2>
               <div className="grid grid-cols-2 gap-3">
                 {GATHERING_ORDER.map((gid) => {
                   const res = RESOURCES.find(r => r.id === gid)!;
@@ -94,7 +101,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                   const blocked = false;
                   const dur     = job_durations[id];
                   return (
-                    <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-center gap-2">
+                    <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-start gap-2">
                       <div className="flex items-center gap-2 self-start">
                         <img src={icon} width={32} height={32} alt={label}
                           style={{ objectFit: 'contain' }} />
@@ -107,7 +114,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                 })}
               </div>
             </div>
-            <EventPanel title="Resource events" events={events?.gathering ?? []} />
+            <EventPanel title="Resource events" events={events?.gathering ?? []} defaultOpen={false} />
           </section>
         </div>
 
@@ -116,9 +123,9 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
         {/* ── Column 2: Parts manufacturing ─────────────────────────────── */}
         <div className="flex-[3] flex flex-col gap-4 min-w-0">
           {/* Inventory */}
-          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-4">
-            <h2 className="text-[#2850B8] font-bold text-sm mb-3">Parts inventory</h2>
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <div className="rounded-xl border border-[#E0E8F8] bg-white px-4 py-2">
+            <h2 className="text-[#2850B8] font-bold text-sm mb-1">Parts inventory</h2>
+            <div className="flex flex-wrap gap-x-6 gap-y-1">
               {PARTS.map(({ id, label, icon }) => (
                 <InventoryItem key={id} icon={icon} label={label} qty={inventory.part[id] ?? 0} />
               ))}
@@ -126,8 +133,8 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
           </div>
           {/* Floor */}
           <section>
-            <div className="rounded-xl border border-[#E0E8F8] bg-white p-5" style={{ minHeight: 480 }}>
-              <h2 className="text-[#2850B8] font-bold text-base mb-4">Parts manufacturing</h2>
+            <div className="rounded-xl border border-[#E0E8F8] bg-white px-4 py-2" style={{ minHeight: 480 }}>
+              <h2 className="text-[#2850B8] font-bold text-base mb-1">Parts manufacturing</h2>
               <div className="flex flex-col gap-3">
                 {STATIONS.map(({ id, label, icon, output_type }) => {
                   const count      = manufacturing_completed[id] ?? 0;
@@ -141,7 +148,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         <span className="text-sm font-semibold text-[#031040] mr-1">{label}</span>
                         <InputChips inputs={inputs} iconMap={RESOURCE_ICON} blockedKeys={missingSet} />
                       </div>
-                      <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
                         <img src={icon} width={55} height={55} alt={output_type}
                           style={{ objectFit: 'contain' }} />
                         <StationStats count={count} blocked={blocked} durationMins={dur} running={running}
@@ -152,29 +159,31 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                 })}
               </div>
             </div>
-            <EventPanel title="Manufacturing events" events={events?.manufacturing ?? []} />
+            <EventPanel title="Manufacturing events" events={events?.manufacturing ?? []} defaultOpen={false} />
           </section>
         </div>
 
         <FlowDots running={running} />
 
         {/* ── Column 3: Robot assembly ───────────────────────────────────── */}
-        <div className="flex-[3] flex flex-col gap-4 min-w-0">
+        <div className="flex-[3] flex flex-col gap-2 min-w-0">
           {/* Inventory */}
-          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-4">
-            <h2 className="text-[#2850B8] font-bold text-sm mb-3">Robot inventory</h2>
+          <div className="rounded-xl border border-[#E0E8F8] bg-white px-3 py-2">
+            <h2 className="text-[#2850B8] font-bold text-sm">Robot inventory</h2>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               {ROBOTS.map(({ id, label, icon }) => (
                 <InventoryItem key={id} icon={icon} label={label} qty={inventory.robot[id] ?? 0} />
               ))}
             </div>
-            {/* Spacer row to match height of Resource/Parts inventory cards */}
-            <div className="mt-2 h-[22px]" />
           </div>
+
+          {/* Order Queue */}
+          <AssemblyQueue queue={queue} removeFromQueue={removeFromQueue} />
+
           {/* Floor */}
           <section>
-            <div className="rounded-xl border border-[#E0E8F8] bg-white p-5" style={{ minHeight: 480 }}>
-              <h2 className="text-[#2850B8] font-bold text-base mb-4">Robot assembly</h2>
+            <div className="rounded-xl border border-[#E0E8F8] bg-white px-3 py-2" style={{ minHeight: 480 }}>
+              <h2 className="text-[#2850B8] font-bold text-base mb-1">Robot assembly</h2>
               <div className="flex flex-col gap-3">
                 {ROBOTS.map(({ id, station_id, label, icon }) => {
                   const count      = assembly_completed[id] ?? 0;
@@ -185,11 +194,11 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                   return (
                     <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] px-4 py-3">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="text-sm font-semibold text-[#031040] mr-1">{label}</span>
                         <InputChips inputs={inputs} iconMap={PART_ICON} blockedKeys={missingSet} />
                       </div>
-                      <div className="flex items-center justify-between gap-4">
-                        <img src={icon} width={60} height={60} alt={label}
-                          style={{ objectFit: 'contain' }} />
+                      <div className="flex items-center gap-4">
+                        <img src={icon} width={60} height={60} alt={label} style={{ objectFit: 'contain' }} />
                         <StationStats count={count} blocked={blocked} durationMins={dur} running={running}
                           tooltip="Waiting for parts" ringSize={90} showCount={false} />
                       </div>
@@ -198,7 +207,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                 })}
               </div>
             </div>
-            <EventPanel title="Assembly events" events={events?.assembly ?? []} />
+            <EventPanel title="Assembly events" events={events?.assembly ?? []} defaultOpen={false} />
           </section>
         </div>
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { EventPanel } from '../../components/EventPanel';
 import { FlowDots } from '../../components/FlowDots';
 import { Chevrons } from '../../components/Chevrons';
+import { AssemblyQueue } from '../../components/AssemblyQueue';
 import { useLevel4 } from './Level4Context';
 import type { LevelScreenProps } from '../types';
 import {
@@ -17,12 +18,15 @@ import {
 const HexagonTierBadge: React.FC<{
   tier: number;
   blocked?: boolean;
+  /** Gray out without the warning icon (e.g. nothing scheduled to build). */
+  disabled?: boolean;
   active?: boolean;
   tooltip?: string;
   size?: number;
-}> = ({ tier: tierProp, blocked = false, active = false, tooltip, size = 50 }) => {
+}> = ({ tier: tierProp, blocked = false, disabled = false, active = false, tooltip, size = 50 }) => {
   const height = Math.round(size * 1.15);
   const tier = (Math.max(1, Math.min(3, tierProp))) as 1 | 2 | 3;
+  const gray = blocked || disabled;
 
   return (
     <div className="relative select-none flex-none" style={{ width: size, height }}>
@@ -33,14 +37,14 @@ const HexagonTierBadge: React.FC<{
         style={{
           display: 'block',
           overflow: 'visible',
-          filter: blocked ? 'grayscale(1)' : 'none',
+          filter: gray ? 'grayscale(1)' : 'none',
         }}
       >
-        {/* Solid blue hexagon (grayscale when blocked) */}
+        {/* Solid blue hexagon (grayscale when blocked or disabled) */}
         <polygon
           points="60,6 107,33 107,87 60,114 13,87 13,33"
-          fill={blocked ? '#8C9BAE' : '#0059E8'}
-          stroke={blocked ? '#8C9BAE' : '#0059E8'}
+          fill={gray ? '#8C9BAE' : '#0059E8'}
+          stroke={gray ? '#8C9BAE' : '#0059E8'}
           strokeWidth="4"
           strokeLinejoin="round"
         />
@@ -48,8 +52,8 @@ const HexagonTierBadge: React.FC<{
         {/* Animated Chevrons */}
         <Chevrons
           tier={tier}
-          active={active && !blocked}
-          inactiveOpacity={blocked ? 0.4 : 1}
+          active={active && !gray}
+          inactiveOpacity={gray ? 0.4 : 1}
         />
       </svg>
 
@@ -142,6 +146,13 @@ const InputChips: React.FC<{
   </span>
 );
 
+const actionBtnClass = (enabled: boolean) =>
+  `rounded-md font-bold text-xs flex items-center justify-center gap-1 py-1 px-1.5 transition w-full select-none border ${
+    enabled
+      ? 'bg-white border-[#0059E8] text-[#0059E8] hover:bg-[#EEF4FF] cursor-pointer'
+      : 'bg-[#F1F4F9] border-[#CBD5E1] text-[#94A3B8] cursor-not-allowed'
+  }`;
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
@@ -154,7 +165,16 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
     job_durations,
     inventory,
     events,
+    robot_queue,
   } = state;
+
+  const queue = robot_queue ?? [];
+  const assemblyActive = state.assembly_active ?? {};
+
+  // Upgrade/add-station actions need a matching robot in inventory.
+  const canForager  = (inventory.robot.gatherer ?? 0) > 0;
+  const canEngineer = (inventory.robot.engineer ?? 0) > 0;
+  const canBuilder  = (inventory.robot.builder ?? 0) > 0;
 
   const level4 = useLevel4();
   const stationSlots = level4?.stationSlots ?? {};
@@ -162,6 +182,8 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
   const maxStations = level4?.maxStations ?? 3;
   const addStation = level4?.addStation ?? (() => {});
   const upgradeStation = level4?.upgradeStation ?? (() => {});
+  const addToQueue = level4?.addToQueue ?? (() => Promise.resolve());
+  const removeFromQueue = level4?.removeFromQueue ?? (() => Promise.resolve());
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -221,15 +243,16 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                 {blocked ? 'Parts unavailable' : durationText}
                               </span>
                               {isMax ? (
-                                <div className="rounded-md bg-[#E2E8F4] text-[#57606A] font-bold text-xs flex items-center justify-center py-1 select-none w-full text-center">
-                                  Max level
-                                </div>
+                                <div></div>
                               ) : (
                                 <button
                                   onClick={() => upgradeStation(id, idx)}
-                                  className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
+                                  title="Assign a Forager to increase gathering speed"
+                                  disabled={!canForager}
+                                  className={actionBtnClass(canForager)}
                                 >
-                                  Upgrade
+                                  <svg width="14" height="20" viewBox="0 0 12 17" fill="none" aria-hidden="true"><path d="M6 14V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  Forager
                                 </button>
                               )}
                             </div>
@@ -240,6 +263,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
+                              disabled={!canBuilder}
                               size={50}
                             />
                             <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
@@ -247,9 +271,12 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                             </span>
                             <button
                               onClick={() => addStation(id)}
-                              className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
+                              title="Assign a Builder to add a new gathering station"
+                              disabled={!canBuilder}
+                              className={actionBtnClass(canBuilder)}
                             >
-                              Add
+                              <svg width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                              Builder
                             </button>
                           </div>
                         )}
@@ -259,7 +286,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                 })}
               </div>
             </div>
-            <EventPanel title="Resource events" events={events?.gathering ?? []} />
+            <EventPanel title="Resource events" events={events?.gathering ?? []} defaultOpen={false} />
           </section>
         </div>
 
@@ -320,15 +347,16 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                 {blocked ? 'Parts unavailable' : durationText}
                               </span>
                               {isMax ? (
-                                <div className="rounded-md bg-[#E2E8F4] text-[#57606A] font-bold text-xs flex items-center justify-center py-1 select-none w-full text-center">
-                                  Max level
-                                </div>
+                                <div></div>
                               ) : (
                                 <button
                                   onClick={() => upgradeStation(id, idx)}
-                                  className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
+                                  title="Assign an Engineer to increase production"
+                                  disabled={!canEngineer}
+                                  className={actionBtnClass(canEngineer)}
                                 >
-                                  Upgrade
+                                  <svg width="14" height="20" viewBox="0 0 12 17" fill="none" aria-hidden="true"><path d="M6 14V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  Engineer
                                 </button>
                               )}
                             </div>
@@ -339,6 +367,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
+                              disabled={!canBuilder}
                               size={50}
                             />
                             <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
@@ -346,9 +375,12 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                             </span>
                             <button
                               onClick={() => addStation(id)}
-                              className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
+                              title="Assign a Builder to add a new manufacturing station"
+                              disabled={!canBuilder}
+                              className={actionBtnClass(canBuilder)}
                             >
-                              Add
+                              <svg width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                              Builder
                             </button>
                           </div>
                         )}
@@ -358,17 +390,17 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                 })}
               </div>
             </div>
-            <EventPanel title="Manufacturing events" events={events?.manufacturing ?? []} />
+            <EventPanel title="Manufacturing events" events={events?.manufacturing ?? []} defaultOpen={false} />
           </section>
         </div>
 
         <FlowDots running={running} />
 
         {/* ── Column 3: Robot assembly ─────────────────────────────────── */}
-        <div className="flex-[3] flex flex-col gap-4 min-w-0">
+        <div className="flex-[3] flex flex-col gap-2 min-w-0">
           {/* Inventory */}
-          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-4">
-            <h2 className="text-[#2850B8] font-bold text-sm mb-3">Robot inventory</h2>
+          <div className="rounded-xl border border-[#E0E8F8] bg-white px-3 py-2">
+            <h2 className="text-[#2850B8] font-bold text-sm">Robot inventory</h2>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               {ROBOTS.map(({ id, label, icon }) => (
                 <InventoryItem key={id} icon={icon} label={label} qty={inventory.robot[id] ?? 0} />
@@ -376,13 +408,20 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
             </div>
           </div>
 
+          {/* Order Queue */}
+          <AssemblyQueue queue={queue} removeFromQueue={removeFromQueue} />
+
           {/* Floor */}
           <section>
             <div className="rounded-xl border border-[#E0E8F8] bg-white p-5" style={{ minHeight: 480 }}>
               <h2 className="text-[#2850B8] font-bold text-base mb-4">Robot assembly</h2>
               <div className="flex flex-col gap-3">
                 {ROBOTS.map(({ id, station_id, label, icon }) => {
-                  const blocked     = station_id in (assembly_blocked ?? {});
+                  // Strict FIFO: only the head of the order queue is staged/built, so a station is
+                  // "scheduled" only if its robot is next in the queue or already building.
+                  const scheduled   = queue[0] === id || !!assemblyActive[station_id];
+                  const blocked     = scheduled && station_id in (assembly_blocked ?? {});
+                  const disabled    = !scheduled;
                   const dur         = job_durations[station_id] ?? job_durations[id];
                   const inputs      = assembly_inputs[station_id] ?? {};
                   const missingSet  = blocked ? new Set(Object.keys(assembly_blocked[station_id] ?? {})) : undefined;
@@ -390,11 +429,20 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
                   return (
                     <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-start gap-3">
-                      {/* Header with Icon, Label, and Input chips */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <img src={icon} width={40} height={40} alt={label} style={{ objectFit: 'contain' }} />
-                        <span className="text-sm font-semibold text-[#031040] mr-1">{label}</span>
-                        <InputChips inputs={inputs} iconMap={PART_ICON} blockedKeys={missingSet} />
+                      {/* Header with Icon, Label, Input chips, and + Queue button */}
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <img src={icon} width={40} height={40} alt={label} style={{ objectFit: 'contain' }} />
+                          <span className="text-sm font-semibold text-[#031040] mr-1">{label}</span>
+                          <InputChips inputs={inputs} iconMap={PART_ICON} blockedKeys={missingSet} />
+                        </div>
+                        <button
+                          onClick={() => addToQueue(id)}
+                          title={`Add ${label} to order queue`}
+                          className="rounded-md font-bold text-xs flex items-center justify-center gap-1 py-1.5 px-3 transition select-none bg-white border border-[#0059E8] text-[#0059E8] hover:bg-[#EEF4FF] cursor-pointer flex-none ml-2"
+                        >
+                          + Queue
+                        </button>
                       </div>
 
                       {/* Stations row (up to 3) + Add button */}
@@ -409,6 +457,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                               <HexagonTierBadge
                                 tier={st.tier}
                                 blocked={blocked}
+                                disabled={disabled}
                                 active={running}
                                 tooltip="Waiting for parts"
                                 size={50}
@@ -417,18 +466,19 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                 className="text-xs font-semibold leading-tight text-center whitespace-nowrap"
                                 style={{ color: blocked ? '#D36B00' : '#57606A' }}
                               >
-                                {blocked ? 'Parts unavailable' : durationText}
+                                {blocked ? 'Parts unavailable' : disabled ? 'Idle' : durationText}
                               </span>
                               {isMax ? (
-                                <div className="rounded-md bg-[#E2E8F4] text-[#57606A] font-bold text-xs flex items-center justify-center py-1 select-none w-full text-center">
-                                  Max level
-                                </div>
+                                <div></div>
                               ) : (
                                 <button
                                   onClick={() => upgradeStation(station_id, idx)}
-                                  className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
+                                  title="Assign an Engineer to increase production"
+                                  disabled={!canEngineer}
+                                  className={actionBtnClass(canEngineer)}
                                 >
-                                  Upgrade
+                                  <svg width="14" height="20" viewBox="0 0 12 17" fill="none" aria-hidden="true"><path d="M6 14V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  Engineer
                                 </button>
                               )}
                             </div>
@@ -439,6 +489,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(station_id)}
+                              disabled={!canBuilder}
                               size={50}
                             />
                             <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
@@ -446,9 +497,12 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                             </span>
                             <button
                               onClick={() => addStation(station_id)}
-                              className="rounded-md font-bold text-xs flex items-center justify-center py-1 px-1.5 transition w-full shadow-sm select-none bg-[#0059E8] hover:bg-[#0048C4] text-white cursor-pointer"
+                              title="Assign a Builder to add a new assembly station"
+                              disabled={!canBuilder}
+                              className={actionBtnClass(canBuilder)}
                             >
-                              Add
+                              <svg width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                              Builder
                             </button>
                           </div>
                         )}
@@ -458,7 +512,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                 })}
               </div>
             </div>
-            <EventPanel title="Assembly events" events={events?.assembly ?? []} />
+            <EventPanel title="Assembly events" events={events?.assembly ?? []} defaultOpen={false} />
           </section>
         </div>
 

@@ -395,6 +395,10 @@ class ControlCommandRequest(BaseModel):
     expected_generation: Optional[int] = None
 
 
+class QueueCommandRequest(BaseModel):
+    robot_type: str
+
+
 @app.get("/api/config")
 async def get_config():
     return {"fully_configured": not ci.validate_config(config)}
@@ -503,6 +507,95 @@ async def _send_server_command(command: str, body: Optional[Dict[str, Any]] = No
         if "lifecycle_status" in receipt:
             store.lifecycle_status = receipt["lifecycle_status"]
             store.running = (store.lifecycle_status == "running")
+            await notify_subscribers(store.snapshot())
+        return receipt
+
+
+@app.post("/api/queue")
+async def add_to_queue(
+    req: QueueCommandRequest,
+):
+    if not config.workshop_access_token:
+        raise HTTPException(status_code=400, detail={
+            "error_code": "not_connected",
+            "message": _connect_failure_message("WORKSHOP_ACCESS_TOKEN is not set in spec-shared/.env."),
+        })
+
+    if not store.active_simulation_id:
+        raise HTTPException(status_code=400, detail={
+            "error_code": "not_connected",
+            "message": _connect_failure_message("No active simulation. Restart the backend."),
+        })
+
+    cmd_url = f"{config.simulation_server_url}/v1/simulations/{store.active_simulation_id}/queue"
+    headers = {
+        "Authorization": f"Bearer {config.workshop_access_token}",
+        "Idempotency-Key": str(uuid.uuid4()),
+        "X-Server-Epoch": store.server_epoch or "",
+    }
+    if config.attendee_id:
+        headers["X-Attendee-Id"] = config.attendee_id
+    body: Dict[str, Any] = {
+        "robot_type": req.robot_type,
+    }
+    if store.run_generation > 0:
+        body["expected_generation"] = store.run_generation
+
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        r = await client.post(cmd_url, json=body, headers=headers)
+        if r.status_code >= 400:
+            try:
+                err_body = r.json()
+            except Exception:
+                err_body = {"message": r.text or f"HTTP {r.status_code}"}
+            raise HTTPException(status_code=r.status_code, detail=err_body)
+
+        receipt = r.json()
+        logger.info(f"Queue: added '{req.robot_type}' to queue -> robot_queue={receipt.get('robot_queue')}", extra=MAJOR)
+        if "robot_queue" in receipt:
+            store.robot_queue = list(receipt["robot_queue"])
+            await notify_subscribers(store.snapshot())
+        return receipt
+
+
+@app.delete("/api/queue/{index}")
+async def remove_from_queue(
+    index: int,
+):
+    if not config.workshop_access_token:
+        raise HTTPException(status_code=400, detail={
+            "error_code": "not_connected",
+            "message": _connect_failure_message("WORKSHOP_ACCESS_TOKEN is not set in spec-shared/.env."),
+        })
+
+    if not store.active_simulation_id:
+        raise HTTPException(status_code=400, detail={
+            "error_code": "not_connected",
+            "message": _connect_failure_message("No active simulation. Restart the backend."),
+        })
+
+    cmd_url = f"{config.simulation_server_url}/v1/simulations/{store.active_simulation_id}/queue/{index}"
+    headers = {
+        "Authorization": f"Bearer {config.workshop_access_token}",
+        "Idempotency-Key": str(uuid.uuid4()),
+        "X-Server-Epoch": store.server_epoch or "",
+    }
+    if config.attendee_id:
+        headers["X-Attendee-Id"] = config.attendee_id
+
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        r = await client.delete(cmd_url, headers=headers)
+        if r.status_code >= 400:
+            try:
+                err_body = r.json()
+            except Exception:
+                err_body = {"message": r.text or f"HTTP {r.status_code}"}
+            raise HTTPException(status_code=r.status_code, detail=err_body)
+
+        receipt = r.json()
+        logger.info(f"Queue: removed index {index} from queue -> robot_queue={receipt.get('robot_queue')}", extra=MAJOR)
+        if "robot_queue" in receipt:
+            store.robot_queue = list(receipt["robot_queue"])
             await notify_subscribers(store.snapshot())
         return receipt
 

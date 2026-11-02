@@ -1,12 +1,12 @@
-
-
-# HIVE Workshop
-
-**HIVE** is a hands-on workshop where you connect a live robotic manufacturing Simulation to Apache Kafka on Confluent Cloud and build real-time insight from its event stream. A simulated factory gathers raw materials, manufactures parts, and assembles robots — publishing every step as an event. Your job is to turn that stream of raw activity into something useful.
-
-Over the course of the workshop you'll deploy Apache Flink SQL to correlate job-start and job-completion events into production durations, maintain live inventory balances with stateful aggregations, and validate continuously running pipelines as the Simulation keeps moving. Later levels extend those streams into a lakehouse with Confluent Tableflow and hand the Simulation over to an IBM Bob AI agent to manage autonomously.
+# Welcome to The Hive
 
 <a href="assets/welcome_to_the_hive.png"><img src="assets/welcome_to_the_hive.png"/></a>
+
+**The Hive** is a hands-on workshop where you monitor a robotic bee manufacturing Simulation.  Your bees gather resources, manufacture parts then assemble them into functional bees of different types: Gatherers, Engineers and Builders. Gatherer bees obtain the required Copper, Energy, Metals, Resin and Silicon required to maufacture the parts required to assemble your bees: Actuator, Battery, Chassis and Electronics.  You will ultimately assume the role as Queen of your robotic bee colony, assigning your bees to build new workstations and upgrade existing ones.  
+
+To be efficient though, you must first obtain detailed insights into your production workflows including rates of resource gathering, time to manufacture parts, bottlenecks in available resources and efficiencies in assembling new robots from limited parts.  To gain insights into your robotic manufacturing Simulation, you'll connect real-time events into Apache Kafka on Confluent Cloud to generate real-time insight from your event stream. As your bees gather raw materials, manufactures parts and assembles robots, they are publishing detailed metadata at every step as a a live stream of events. Your job is to turn that stream of raw activity into something useful.
+
+The Hive Workshop is structured as multiple Levels that you progress through while deploying Apache Flink SQL to correlate workstation start and completion events into production durations, maintain live inventory balances with stateful aggregations and validate continuously running pipelines as the Simulation keeps moving. In later levels, you'll store those streams in Apache Iceberg tables in Google BigQuery using Confluent Tableflow then hand the Simulation over to IBM Bob and Google Gemini to manage autonomously.
 
 ## Workshop Levels
 Head to **[Level 1 — Environment Setup](level-1-environment-setup/README.md)** to configure your Confluent Cloud environment, provision your Kafka topics, and launch the Hive Dashboard.

@@ -19,16 +19,16 @@ export const RESOURCE_ICON: Record<string, string> = {
 
 // ── Parts manufacturing ───────────────────────────────────────────────────────
 export const STATIONS: { id: string; label: string; icon: string; output_type: string }[] = [
-  { id: 'actuator_fabrication', label: 'Actuator Fabrication', icon: '/icons/svg/parts_actuator.svg',    output_type: 'actuator' },
-  { id: 'battery_assembly',     label: 'Battery Assembly',     icon: '/icons/svg/parts_battery.svg',     output_type: 'battery' },
-  { id: 'structural_molding',   label: 'Chassis Molding',      icon: '/icons/svg/parts_chassis.svg',     output_type: 'chassis' },
-  { id: 'electronics_assembly', label: 'Electronics Assembly', icon: '/icons/svg/parts_electronics.svg', output_type: 'electronics' },
+  { id: 'actuator', label: 'Actuator', icon: '/icons/svg/parts_actuator.svg',    output_type: 'actuator' },
+  { id: 'battery',     label: 'Battery',     icon: '/icons/svg/parts_battery.svg',     output_type: 'battery' },
+  { id: 'chassis',   label: 'Chassis',      icon: '/icons/svg/parts_chassis.svg',     output_type: 'chassis' },
+  { id: 'electronics', label: 'Electronics', icon: '/icons/svg/parts_electronics.svg', output_type: 'electronics' },
 ];
 
 export const ROBOTS: { id: string; station_id: string; label: string; icon: string }[] = [
-  { id: 'engineer', station_id: 'worker_assembly',  label: 'Engineer', icon: '/icons/svg/robot_engineer_body.svg' },
-  { id: 'gatherer',  station_id: 'gatherer_assembly', label: 'Gatherer',  icon: '/icons/svg/robot_gatherer_body.svg' },
-  { id: 'builder',  station_id: 'builder_assembly', label: 'Builder',  icon: '/icons/svg/robot_builder_body.svg' },
+  { id: 'engineer', station_id: 'engineer',  label: 'Engineer', icon: '/icons/svg/robot_engineer_body.svg' },
+  { id: 'gatherer',  station_id: 'gatherer', label: 'Gatherer',  icon: '/icons/svg/robot_gatherer_body.svg' },
+  { id: 'builder',  station_id: 'builder', label: 'Builder',  icon: '/icons/svg/robot_builder_body.svg' },
 ];
 
 export const PARTS: { id: string; label: string; icon: string }[] = [
