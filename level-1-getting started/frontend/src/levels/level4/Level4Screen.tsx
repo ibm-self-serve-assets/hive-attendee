@@ -15,6 +15,9 @@ import {
   PART_ICON,
 } from '../robots';
 
+// Set to true to show the Gatherer/Engineer/Builder buttons and the "Add station" hexagons.
+const SHOW_ORDER_BUTTONS = false;
+
 const AddStationHexagon: React.FC<{ onClick?: () => void; disabled?: boolean; size?: number }> = ({ onClick, disabled = false, size = 50 }) => {
   const height = Math.round(size * 1.15);
   return (
@@ -176,7 +179,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                               >
                                 {blocked ? 'Parts unavailable' : durationText}
                               </span>
-                              {isMax ? (
+                              {isMax || !SHOW_ORDER_BUTTONS ? (
                                 <div></div>
                               ) : (
                                 <button
@@ -193,7 +196,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           );
                         })}
 
-                        {slots.length < maxStations && (
+                        {SHOW_ORDER_BUTTONS && slots.length < maxStations && (
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
@@ -279,7 +282,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                               >
                                 {blocked ? 'Parts unavailable' : durationText}
                               </span>
-                              {isMax ? (
+                              {isMax || !SHOW_ORDER_BUTTONS ? (
                                 <div></div>
                               ) : (
                                 <button
@@ -296,7 +299,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           );
                         })}
 
-                        {slots.length < maxStations && (
+                        {SHOW_ORDER_BUTTONS && slots.length < maxStations && (
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
@@ -380,7 +383,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                               >
                                 {blocked ? 'Parts unavailable' : disabled ? 'Idle' : durationText}
                               </span>
-                              {isMax ? (
+                              {isMax || !SHOW_ORDER_BUTTONS ? (
                                 <div></div>
                               ) : (
                                 <button
@@ -397,7 +400,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           );
                         })}
 
-                        {slots.length < maxStations && (
+                        {SHOW_ORDER_BUTTONS && slots.length < maxStations && (
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(station_id)}
