@@ -26,8 +26,8 @@ export const STATIONS: { id: string; label: string; icon: string; output_type: s
 ];
 
 export const ROBOTS: { id: string; station_id: string; label: string; icon: string }[] = [
-  { id: 'engineer', station_id: 'engineer',  label: 'Engineer', icon: '/icons/svg/robot_engineer_body.svg' },
   { id: 'gatherer',  station_id: 'gatherer', label: 'Gatherer',  icon: '/icons/svg/robot_gatherer_body.svg' },
+  { id: 'engineer', station_id: 'engineer',  label: 'Engineer', icon: '/icons/svg/robot_engineer_body.svg' },
   { id: 'builder',  station_id: 'builder', label: 'Builder',  icon: '/icons/svg/robot_builder_body.svg' },
 ];
 
