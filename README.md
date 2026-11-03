@@ -6,7 +6,6 @@ A bee hive is a useful analogy for understanding event-driven systems because, a
 
 <a href="images/welcome_to_the_hive.png"><img src="images/welcome_to_the_hive.png" width="35%"/></a>
 
-
 ## Workshop Levels
 Head to **[Level 1 — Getting Started](level-1-getting-started/README.md)** to learn about your personal Hive simulation, configure your development environment and expore your Hive Dashboard.
 
