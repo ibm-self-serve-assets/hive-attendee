@@ -159,11 +159,11 @@ Place an order, then watch its icon in the queue.  While earlier orders are buil
 
 ---
 
-## What's Next: Prioritizing Parts Manufacturing
+## What's Next: Part Prioritization (Level 5)
 
 The queue answers *what* the Hive should build next.  It raises a new question: how do we prioritize **parts manufacturing** based on the robot at the front of the queue?
 
-The **Robot Assembly** stations "know" the parts they need, but they are independent of **Parts Manufacturing**.  The non-event-driven solution would be a hard-coded REST call to place orders for parts based on the next robot in the queue.  Instead, you can use Flink to join `queens_orders` with the recipe inputs from `assembly-started` and produce a new topic that drives a **Parts Manufacturing Queue**.  That, and handing the Queen's decisions to your AI coding assistant, are the later levels.
+The **Robot Assembly** stations "know" the parts they need, but they are independent of **Parts Manufacturing**.  The non-event-driven solution would be a hard-coded REST call to place orders for parts based on the next robot in the queue.  Instead, you can use Flink to join `queens_orders` with the recipe inputs from `assembly-started` and produce a new topic that drives a **Parts Manufacturing Queue**.  That is Level 5.  Handing the Queen's decisions to your AI coding assistant comes in the later levels.
 
 ## Useful CLI Commands
 
@@ -178,4 +178,4 @@ confluent flink statement delete hive-queens-orders-jobs
 
 ## Next Step
 
-After exploring the Level 4 Dashboard, proceed to Level 5 - Tableflow.
+After exploring the Level 4 Dashboard, proceed to Level 5 - Part Prioritization (coming soon).
