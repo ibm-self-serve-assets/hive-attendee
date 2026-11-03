@@ -223,7 +223,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
         <FlowDots running={state.running} />
 
-        {/* ── Lane 3: Robot assembly ───────────────────────────────────────── */}
+        {/* ── Lane 3: Worker robot assembly ───────────────────────────────────────── */}
         <section className="flex-none" style={{ width: 420 }}>
           <div
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"

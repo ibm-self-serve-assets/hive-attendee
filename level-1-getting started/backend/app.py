@@ -38,6 +38,22 @@ hive_queens_orders_consumer: Optional[QueensOrdersConsumer] = None
 subscribers: List[asyncio.Queue] = []
 
 
+async def _restart_after_unlock(level_label: str) -> None:
+    """
+    A level's gate went from not met to met: stop any running Simulation and start it
+    from a clean state (restart without starting), so the attendee begins the level fresh.
+    Called only on a not-met -> met transition, never for a gate already met at startup,
+    so switching levels in the UI never triggers it.
+    """
+    if not store.active_simulation_id:
+        return  # not connected yet; auto_connect() already resets to a clean paused run
+    logger.info(f"{level_label} gate met after being unmet; restarting the Simulation", extra=MAJOR)
+    try:
+        await send_control(ControlCommandRequest(command="restart", start=False))
+    except Exception as e:
+        logger.warning(f"Forced restart after {level_label} unlock failed: {e}")
+
+
 async def notify_subscribers(snap: Dict[str, Any]):
     data = json.dumps(snap)
     for q in list(subscribers):
@@ -77,6 +93,7 @@ async def lifespan(app: FastAPI):
         api_key=config.confluent_api_key,
         api_secret=config.confluent_api_secret,
         on_change=_notify_state,
+        on_unlocked=_restart_after_unlock,
     )
     event_topics_watcher.start()
 
@@ -86,6 +103,7 @@ async def lifespan(app: FastAPI):
         api_key=config.confluent_api_key,
         api_secret=config.confluent_api_secret,
         on_change=_notify_state,
+        on_unlocked=_restart_after_unlock,
     )
     hive_job_durations_watcher.start()
 
@@ -104,6 +122,7 @@ async def lifespan(app: FastAPI):
         api_key=config.confluent_api_key,
         api_secret=config.confluent_api_secret,
         on_change=_notify_state,
+        on_unlocked=_restart_after_unlock,
     )
     hive_inventory_balances_watcher.start()
 
@@ -122,6 +141,7 @@ async def lifespan(app: FastAPI):
         api_key=config.confluent_api_key,
         api_secret=config.confluent_api_secret,
         on_change=_notify_state,
+        on_unlocked=_restart_after_unlock,
     )
     hive_queens_orders_watcher.start()
 

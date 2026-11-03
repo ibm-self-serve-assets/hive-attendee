@@ -1,41 +1,47 @@
-# The Queen's Orders with Apache Flink (Confluent CLI)
+# The Queen's Orders
 
 ## Overview & Goal
 
-At the end of Level 3, you may have noticed a UI element in the top-right of your Hive Dashboard: the list of orders for robots in the **Robot assembly queue**.  As below, there are 3 orders in the queue: 2 x **G**atherer robots followed by an **E**ngineer robot.  The left-most icon indicates the next robot in queue to be assembled once parts are available.
+At the end of Level 3, you may have noticed a UI element in the top-right of your Hive Dashboard: the list of orders for robots in the **Queen's Orders**.  As below, there are orders for new Workers in the queue.  The left-most icon indicates the next robot in queue to be assembled once parts are available.
 
-<img src="screenshots/robot_assembly_queue.png"/>
+<img src="screenshots/queens_orders.png"/>
 
-Until now, that queue has been a black box.  In Level 4, the **Queen** takes control of it.  She decides which robots the Hive builds and in what order, and she tells the Hive by publishing **events** rather than by calling the assembly line directly.
+In the queue above for the Queen's orders, we can see:
 
-**The Problem:** The Queen's orders are separate events (`queen-robot-ordered`, `queen-robot-cancelled`, and so on).  No single event says "here is the queue right now".  To know what is waiting to be built, a consumer would have to replay every order and subtract everything that was cancelled or has already started assembly.
+- **Next to be assembled:** Gatherer to upgrade a Resin workstation
+- **After that:** Gatherer to upgrade the Metals workstation
+- **And after that:** Engineer to upgrade an Actuator workstation
 
-**Your Objective:** Use Apache Flink to fold those events into a `queens_orders` table with one row per order.  The dashboard reads that table to draw the queue, so the queue on screen is nothing more than a view of your Flink output.
+The **Queen** decides which new Worker robots are required to improve the Hive and in what order. And she does this by publishing **events**.
 
-### What robots do
+**The Problem:** The Queen's orders are separate events (`queen-robot-ordered`, `queen-robot-cancelled`, and so on).  No single event says "here is the queue right now".  To know what is waiting to be built, every event consumer would have to cache every order and subtract everything that was cancelled or also track the assembly status of Worker robots in the Assembly process.
 
-The Queen orders three kinds of robot.  Each order names the workstation the robot is for:
+**Your Objective:** Use Apache Flink to fold these events into a `queens_orders` table with one row per order.  Your Hive Dashboard can then read that table to draw the queue, so the queue on screen is nothing more than a view of your Flink output.
 
-| Robot | What it does | Allowed stations | `action` |
+### How do the different Worker types behave?
+
+The Queen can order three kinds of Worker robots.  Each order names the workstation the Worker is for:
+
+| Worker Type | What it does | Allowed stations | `action` |
 |---|---|---|---|
 | **Gatherer** | Speeds up a gathering station | Gathering stations only (`copper`, `energy`, `metals`, `resin`, `silicon`) | `upgrade` |
 | **Engineer** | Speeds up a station | Manufacturing or assembly stations only | `upgrade` |
 | **Builder** | Adds a new station | Any station group | `add` |
 
-The Simulation rejects an order that breaks these pairing rules, so the queue only ever holds valid orders.
-
 > **Not wired up yet:** a finished robot is assigned to its order (`queen-robot-assigned`), but the assignment does not change the station yet.  The dashboard therefore shows the queue and its status changes, and the stations keep their starting tiers.
 
 ### New Kafka Topics and Table
 
-The Simulation adds three Queen topics to the ones you created in Level 1, and extends two existing ones with an `order_id`:
+Your Hive Simulation includes three Queen topics::
 
 | Topic | Written when |
 |---|---|
 | `queen-robot-ordered` | The Queen places an order. Carries `order_id`, `robot_type`, `station`, `action`. |
 | `queen-robot-cancelled` | The Queen cancels an order that is still in the queue. |
 | `queen-robot-assigned` | A robot finished assembly and was assigned. `causation_id` is the id of the `assembly-completed` event. |
-| `assembly-started` / `assembly-completed` | Now carry the `order_id` they were built for. |
+
+
+Note that we must also track when the Queen's orders have been processed.  The `assembly-started` topic triggers the removal of an order from the open order queue.  So your Flink SQL must process these 4 orders to track status of the Queen's order queue:
 
 ```
 queen-robot-ordered ────┐
@@ -44,8 +50,6 @@ assembly-started ───────┤
 queen-robot-assigned ───┤        (highest rank wins)       (upsert changelog)
 queen-robot-cancelled ──┘
 ```
-
-If your Level 1 topics were created before this level was added, rerun `provision_topics.py` from Level 1.  It is safe to run twice.
 
 ---
 
@@ -61,38 +65,27 @@ If your Level 1 topics were created before this level was added, rerun `provisio
 
 - Level 3 is complete: `resource_inventory` exists and its statement is **Running**.
 - The Simulation is running and events are flowing.
-- The Confluent CLI is installed and you are logged in (see [Level 3, Steps 1 and 2](../level-3-hive-inventory/README.md)).  Use the same `ENV_ID`, `CLUSTER_ID` and `POOL_ID` variables.
+- You know how to execute a Flink SQL script in Confluent Cloud, using either the **Confluent Cloud UI** (Level 2) or the **Confluent CLI** (Level 3).
 
-```bash
-echo $ENV_ID/$CLUSTER_ID/$POOL_ID
-```
+---
 
-If that prints empty values, export them again as described in Level 3.
+## Run the Level 4 Scripts
+
+Execute the three scripts in the [`flink/`](flink/) directory, in order, using whichever method you prefer: the **Confluent Cloud UI** (as in Level 2) or the **Confluent CLI** (as in Level 3).  The steps are the same as in those levels, only the SQL files are new.
+
+| Step | Script | Type | Expected status |
+|---|---|---|---|
+| 1 | [`01_create_sink.sql`](flink/01_create_sink.sql) | DDL: runs once | `COMPLETED` |
+| 2 | [`02_run_jobs.sql`](flink/02_run_jobs.sql) | DML: runs continuously | `RUNNING` |
+| 3 | [`03_validate.sql`](flink/03_validate.sql) | Query: for checking only | Results appear |
+
+If you use the CLI, run the commands from the **Level 4 directory** with the same `$ENV_ID`, `$CLUSTER_ID` and `$POOL_ID` variables as Level 3.  Suggested statement names are `hive-queens-orders-sink` and `hive-queens-orders-jobs`.
 
 ---
 
 ## Step 1 — Create the Orders Sink Table
 
-**NOTE:** Ensure your Terminal window is in the **Level 4 directory** when running the following commands.
-
-Create the `queens_orders` table in Flink and the backing Kafka topic with upsert changelog mode.
-
-```bash
-confluent flink statement create hive-queens-orders-sink \
-  --compute-pool $POOL_ID \
-  --environment $ENV_ID \
-  --database $CLUSTER_ID \
-  --sql "$(cat flink/01_create_sink.sql)" > /dev/null
-```
-
-Confirm it succeeded:
-```bash
-confluent flink statement describe hive-queens-orders-sink -o json | grep -E '"(status|status_detail)"'
-```
-
-**Expected result:** status `COMPLETED`.  This is a DDL statement, so it runs once and finishes.  It starts as `PENDING`, so wait a few seconds and check again.
-
-If the status is `FAILED`, the `status_detail` line explains why.
+Execute `01_create_sink.sql`.  It creates the `queens_orders` table in Flink and the backing Kafka topic with upsert changelog mode.  This is a DDL statement, so it runs once and finishes with status `COMPLETED`.
 
 The table has one row per order:
 
@@ -109,23 +102,7 @@ The table has one row per order:
 
 ## Step 2 — Start the Orders Job
 
-Run `02_run_jobs.sql` to start the continuous streaming statement.
-
-```bash
-confluent flink statement create hive-queens-orders-jobs \
-  --compute-pool $POOL_ID \
-  --environment $ENV_ID \
-  --database $CLUSTER_ID \
-  --sql "$(cat flink/02_run_jobs.sql)" > /dev/null
-```
-
-Confirm it is running:
-
-```bash
-confluent flink statement describe hive-queens-orders-jobs -o json | grep -E '"(status|status_detail)"'
-```
-
-**Expected result:** It starts as `PENDING` and can take a minute or two to reach `RUNNING`.  Execute the command as needed until `RUNNING` is displayed.
+Execute `02_run_jobs.sql` to start the continuous streaming statement.  It starts as `PENDING` and can take a minute or two to reach `RUNNING`.  Do not continue until it is `RUNNING`, and leave it running: the dashboard's Level 4 view depends on it.
 
 ### How the Queue Is Computed
 
@@ -149,20 +126,9 @@ The **queue** on the dashboard is the rows with `status = 'OPEN'`, sorted by `pl
 
 ---
 
-## Step 3 — Validate using Flink Shell
+## Step 3 — Validate the Results
 
-**1. Open the Flink shell.**
-```bash
-confluent flink shell \
-  --compute-pool $POOL_ID \
-  --environment $ENV_ID \
-  --database $CLUSTER_ID
-```
-A `>` prompt appears when the shell is ready.
-
-**2. Copy the query** from `flink/03_validate.sql`, paste it at the `>` prompt, and press **Enter**.
-
-**3. Read the result.** After a delay of 5-10 seconds a table of results opens and auto-updates while the Simulation runs.
+Execute the query in `03_validate.sql`, either in a new cell of the Flink SQL Workspace or at the prompt of the Flink shell (`confluent flink shell --compute-pool $POOL_ID --environment $ENV_ID --database $CLUSTER_ID`).  The Simulation should be running so you can watch the rows change.  After a delay of 5-10 seconds a table of results appears and auto-updates.
 
 You should see:
 - On a fresh run, 8 rows, all `OPEN`: the Queen's initial orders.
@@ -170,11 +136,11 @@ You should see:
 - A cancelled order shows `CANCELLED`.
 - If you restarted the Simulation, earlier runs are listed too.  Each run has its own `run_id`.
 
-**4. Congratulations! Level 4 Achieved!!!**
+When you have verified the results, stop this query (**Stop** in the UI, or press `Q` in the shell, then `EXIT;` or `Ctrl+D` to close it).  Only the `02_run_jobs.sql` statement needs to keep running.
 
-Open your Hive Dashboard and select **Level 4.**  The queue on screen is the same data as in the Flink Shell.  The dashboard updates within a second of a new value being written, while the Flink Shell can lag by up to a minute.  Both read the same `queens_orders` topic, but the dashboard backend uses `read_uncommitted` and the shell uses `read_committed`, which only shows records after Flink's checkpoint transaction commits.
+**Congratulations! Level 4 Achieved!!!**
 
-**5. Close the results and the shell.** Press `Q` to close the results. Then type `EXIT;` or press `Ctrl+D` to close the shell.
+Open your Hive Dashboard and select **Level 4.**  The queue on screen is the same data as in the validation query.  The dashboard updates within a second of a new value being written, while the Flink Shell can lag by up to a minute.  Both read the same `queens_orders` topic, but the dashboard backend uses `read_uncommitted` and the shell uses `read_committed`, which only shows records after Flink's checkpoint transaction commits.
 
 > **Gate Check:** The dashboard Level 4 view unlocks once the `queens_orders` topic exists.  Running `01_create_sink.sql` (Step 1) creates it.
 
@@ -186,11 +152,11 @@ Open your Hive Dashboard and select **Level 4.**  The queue on screen is the sam
 
 Every workstation now has buttons that act as the Queen:
 
-* **Gathering stations:** the **Forager** button orders a **Gatherer** to upgrade the station.
+* **Gathering stations:** the **Gatherer** button orders a **Gatherer** to upgrade the station.
 * **Manufacturing and assembly stations:** the **Engineer** button orders an **Engineer** to upgrade the station.
 * **Every station group:** the **Builder** button, next to the dashed hexagon, orders a **Builder** to add a station.
 
-Pressing a button sends one order to the Simulation as a `queen-robot-ordered` event.  The dashboard does **not** put the order in the queue itself.  It appears in the **Robot assembly queue** only after the event has travelled through Flink into `queens_orders`, which is why there can be a moment between the click and the new icon.
+Pressing a button sends one order to the Simulation as a `queen-robot-ordered` event.  The dashboard does **not** put the order in the queue itself.  It appears in the **Queen's Orders** only after the event has travelled through Flink into `queens_orders`, which is why there can be a moment between the click and the new icon.
 
 ### Cancelling an Order
 
@@ -198,7 +164,7 @@ Hover over a robot in the queue and click the **x** that appears to cancel the o
 
 ### Watching the Status Change
 
-Place an order, then watch its icon in the queue.  While earlier orders are built, it waits.  When its turn comes, assembly starts, the icon leaves the queue and the same row in `queens_orders` changes from `OPEN` to `IN_ASSEMBLY`.  You can see the row change in the Flink Shell by rerunning the Step 3 query.
+Place an order, then watch its icon in the queue.  While earlier orders are built, it waits.  When its turn comes, assembly starts, the icon leaves the queue and the same row in `queens_orders` changes from `OPEN` to `IN_ASSEMBLY`.  You can see the row change by rerunning the Step 3 query.
 
 ---
 

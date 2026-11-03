@@ -116,14 +116,15 @@ class DashboardStore:
         self.event_topics_missing: List[str] = []
 
         # Level 2 gate: the workstation_efficiency topic exists (created by the attendee's Flink SQL).
+        # Re-evaluated continuously like Level 1's, so deleting the topic re-locks Level 2.
         # Independent of the Simulation run, so reset() leaves it alone.
         self.workstation_efficiency_ready: bool = False
 
-        # Level 3 gate: the resource_inventory topic exists.
+        # Level 3 gate: the resource_inventory topic exists. Re-evaluated continuously.
         # Independent of the Simulation run, so reset() leaves it alone.
         self.resource_inventory_ready: bool = False
 
-        # Level 4 gate: the queens_orders topic exists.
+        # Level 4 gate: the queens_orders topic exists. Re-evaluated continuously.
         # Independent of the Simulation run, so reset() leaves it alone.
         self.queens_orders_ready: bool = False
 

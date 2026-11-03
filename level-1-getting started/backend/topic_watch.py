@@ -32,6 +32,11 @@ def load_event_topic_names() -> List[str]:
     return [key.replace(".", "-") for key in schema["topics"]]
 
 
+# Called with a level label when that level's gate goes from not met to met.
+# Not called for a gate that is already met the first time it is checked.
+OnUnlocked = Callable[[str], Awaitable[None]]
+
+
 class EventTopicsWatcher:
     """
     Polls Confluent Cloud for the Simulation event topics defined in event_payloads.json
@@ -46,9 +51,11 @@ class EventTopicsWatcher:
         api_key: Optional[str],
         api_secret: Optional[str],
         on_change: Callable[[], Awaitable[None]],
+        on_unlocked: Optional[OnUnlocked] = None,
     ):
         self.store = store
         self.on_change = on_change
+        self.on_unlocked = on_unlocked
         self._conf = {
             "bootstrap.servers": bootstrap_servers,
             "security.protocol": "SASL_SSL",
@@ -82,6 +89,7 @@ class EventTopicsWatcher:
         ]
 
     async def _run(self) -> None:
+        was_ready: Optional[bool] = None  # None until the first successful check
         while True:
             try:
                 missing = await asyncio.to_thread(self._missing_topics)
@@ -94,6 +102,9 @@ class EventTopicsWatcher:
                         extra=MAJOR,
                     )
                     await self.on_change()
+                if ready and was_ready is False and self.on_unlocked:
+                    await self.on_unlocked("Level 1")
+                was_ready = ready
             except asyncio.CancelledError:
                 return
             except Exception as e:
@@ -103,8 +114,9 @@ class EventTopicsWatcher:
 
 class CalculatedValuesWatcher:
     """
-    Polls Confluent Cloud until the `workstation_efficiency` topic exists (Flink creates it when the
-    attendee runs 01_create_sink.sql), then sets `store.workstation_efficiency_ready` (and keeps it set).
+    Polls Confluent Cloud for the `workstation_efficiency` topic (Flink creates it when the
+    attendee runs 01_create_sink.sql) and keeps `store.workstation_efficiency_ready` current,
+    so deleting the topic locks Level 2 again.
     Only checks that the topic exists; it never reads records.
     """
 
@@ -116,10 +128,12 @@ class CalculatedValuesWatcher:
         api_secret: Optional[str],
         on_change: Callable[[], Awaitable[None]],
         topic: str = "workstation_efficiency",
+        on_unlocked: Optional[OnUnlocked] = None,
     ):
         self.store = store
         self.topic = topic
         self.on_change = on_change
+        self.on_unlocked = on_unlocked
         self._conf = {
             "bootstrap.servers": bootstrap_servers,
             "security.protocol": "SASL_SSL",
@@ -149,13 +163,21 @@ class CalculatedValuesWatcher:
         return topic_meta is not None and topic_meta.error is None
 
     async def _run(self) -> None:
-        while not self.store.workstation_efficiency_ready:
+        was_ready: Optional[bool] = None  # None until the first successful check
+        while True:
             try:
-                if await asyncio.to_thread(self._topic_exists):
-                    self.store.workstation_efficiency_ready = True
-                    logger.info(f"Level 2 unlocked: Topic {self.topic} exists", extra=MAJOR)
+                ready = await asyncio.to_thread(self._topic_exists)
+                if ready != self.store.workstation_efficiency_ready:
+                    self.store.workstation_efficiency_ready = ready
+                    logger.info(
+                        f"Level 2 unlocked: Topic {self.topic} exists" if ready
+                        else f"Level 2 locked: Topic {self.topic} is missing",
+                        extra=MAJOR,
+                    )
                     await self.on_change()
-                    return
+                if ready and was_ready is False and self.on_unlocked:
+                    await self.on_unlocked("Level 2")
+                was_ready = ready
             except asyncio.CancelledError:
                 return
             except Exception as e:
@@ -165,9 +187,9 @@ class CalculatedValuesWatcher:
 
 class InventoryBalancesWatcher:
     """
-    Polls Confluent Cloud until the `resource_inventory` topic exists
-    (Flink creates it when the attendee runs 01_create_sink.sql for Level 3),
-    then sets `store.resource_inventory_ready` (and keeps it set).
+    Polls Confluent Cloud for the `resource_inventory` topic
+    (Flink creates it when the attendee runs 01_create_sink.sql for Level 3)
+    and keeps `store.resource_inventory_ready` current, so deleting the topic locks Level 3 again.
     Only checks that the topic exists; it never reads records.
     """
 
@@ -179,10 +201,12 @@ class InventoryBalancesWatcher:
         api_secret: Optional[str],
         on_change: Callable[[], Awaitable[None]],
         topic: str = "resource_inventory",
+        on_unlocked: Optional[OnUnlocked] = None,
     ):
         self.store = store
         self.topic = topic
         self.on_change = on_change
+        self.on_unlocked = on_unlocked
         self._conf = {
             "bootstrap.servers": bootstrap_servers,
             "security.protocol": "SASL_SSL",
@@ -210,13 +234,21 @@ class InventoryBalancesWatcher:
         return topic_meta is not None and topic_meta.error is None
 
     async def _run(self) -> None:
-        while not self.store.resource_inventory_ready:
+        was_ready: Optional[bool] = None  # None until the first successful check
+        while True:
             try:
-                if await asyncio.to_thread(self._topic_exists):
-                    self.store.resource_inventory_ready = True
-                    logger.info(f"Level 3 unlocked: Topic {self.topic} exists", extra=MAJOR)
+                ready = await asyncio.to_thread(self._topic_exists)
+                if ready != self.store.resource_inventory_ready:
+                    self.store.resource_inventory_ready = ready
+                    logger.info(
+                        f"Level 3 unlocked: Topic {self.topic} exists" if ready
+                        else f"Level 3 locked: Topic {self.topic} is missing",
+                        extra=MAJOR,
+                    )
                     await self.on_change()
-                    return
+                if ready and was_ready is False and self.on_unlocked:
+                    await self.on_unlocked("Level 3")
+                was_ready = ready
             except asyncio.CancelledError:
                 return
             except Exception as e:
@@ -226,9 +258,9 @@ class InventoryBalancesWatcher:
 
 class QueensOrdersWatcher:
     """
-    Polls Confluent Cloud until the `queens_orders` topic exists
-    (Flink creates it when the attendee runs 01_create_sink.sql for Level 4),
-    then sets `store.queens_orders_ready` (and keeps it set).
+    Polls Confluent Cloud for the `queens_orders` topic
+    (Flink creates it when the attendee runs 01_create_sink.sql for Level 4)
+    and keeps `store.queens_orders_ready` current, so deleting the topic locks Level 4 again.
     Only checks that the topic exists; it never reads records.
     """
 
@@ -240,10 +272,12 @@ class QueensOrdersWatcher:
         api_secret: Optional[str],
         on_change: Callable[[], Awaitable[None]],
         topic: str = "queens_orders",
+        on_unlocked: Optional[OnUnlocked] = None,
     ):
         self.store = store
         self.topic = topic
         self.on_change = on_change
+        self.on_unlocked = on_unlocked
         self._conf = {
             "bootstrap.servers": bootstrap_servers,
             "security.protocol": "SASL_SSL",
@@ -271,13 +305,21 @@ class QueensOrdersWatcher:
         return topic_meta is not None and topic_meta.error is None
 
     async def _run(self) -> None:
-        while not self.store.queens_orders_ready:
+        was_ready: Optional[bool] = None  # None until the first successful check
+        while True:
             try:
-                if await asyncio.to_thread(self._topic_exists):
-                    self.store.queens_orders_ready = True
-                    logger.info(f"Level 4 unlocked: Topic {self.topic} exists", extra=MAJOR)
+                ready = await asyncio.to_thread(self._topic_exists)
+                if ready != self.store.queens_orders_ready:
+                    self.store.queens_orders_ready = ready
+                    logger.info(
+                        f"Level 4 unlocked: Topic {self.topic} exists" if ready
+                        else f"Level 4 locked: Topic {self.topic} is missing",
+                        extra=MAJOR,
+                    )
                     await self.on_change()
-                    return
+                if ready and was_ready is False and self.on_unlocked:
+                    await self.on_unlocked("Level 4")
+                was_ready = ready
             except asyncio.CancelledError:
                 return
             except Exception as e:

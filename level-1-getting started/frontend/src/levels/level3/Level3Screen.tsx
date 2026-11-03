@@ -187,7 +187,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
         <FlowDots running={running} />
 
-        {/* ── Column 3: Robot assembly ───────────────────────────────────── */}
+        {/* ── Column 3: Worker robot assembly ───────────────────────────────────── */}
         <div className="flex-[3] flex flex-col gap-2 min-w-0">
           {/* The Queen's open orders */}
           <AssemblyQueue queue={queue} cancelOrder={cancelOrder} />
@@ -195,7 +195,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
           {/* Floor */}
           <section>
             <div className="rounded-xl border border-[#E0E8F8] bg-white px-3 py-2" style={{ minHeight: 480 }}>
-              <h2 className="text-[#2850B8] font-bold text-base mb-1">Robot assembly</h2>
+              <h2 className="text-[#2850B8] font-bold text-base mb-1">Worker robot assembly</h2>
               <div className="flex flex-col gap-3">
                 {ROBOTS.map(({ id, station_id, label, icon }) => {
                   const blocked    = station_id in assembly_blocked;

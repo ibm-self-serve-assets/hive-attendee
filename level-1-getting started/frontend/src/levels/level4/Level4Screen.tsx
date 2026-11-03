@@ -182,12 +182,12 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                               ) : (
                                 <button
                                   onClick={() => upgradeStation(id)}
-                                  title="Assign a Forager to increase gathering speed"
+                                  title="Assign a Gatherer to increase gathering speed"
                                   disabled={isOrderPending(id)}
                                   className={actionBtnClass(!isOrderPending(id))}
                                 >
                                   <svg width="14" height="20" viewBox="0 0 12 17" fill="none" aria-hidden="true"><path d="M6 14V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  Forager
+                                  Gatherer
                                 </button>
                               )}
                             </div>
@@ -330,7 +330,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
         <FlowDots running={running} />
 
-        {/* ── Column 3: Robot assembly ─────────────────────────────────── */}
+        {/* ── Column 3: Worker robot assembly ─────────────────────────────────── */}
         <div className="flex-[3] flex flex-col gap-2 min-w-0">
           {/* The Queen's open orders */}
           <AssemblyQueue queue={queue} cancelOrder={cancelOrder} />
@@ -338,7 +338,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
           {/* Floor */}
           <section>
             <div className="rounded-xl border border-[#E0E8F8] bg-white p-5" style={{ minHeight: 480 }}>
-              <h2 className="text-[#2850B8] font-bold text-base mb-4">Robot assembly</h2>
+              <h2 className="text-[#2850B8] font-bold text-base mb-4">Worker robot assembly</h2>
               <div className="flex flex-col gap-3">
                 {ROBOTS.map(({ id, station_id, label, icon }) => {
                   // Strict FIFO: only the head of the order queue is staged/built, so a station is

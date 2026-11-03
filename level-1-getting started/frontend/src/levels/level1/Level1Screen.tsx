@@ -80,7 +80,7 @@ export const Level1Screen: React.FC<LevelScreenProps> = ({ state }) => {
           <EventPanel title="Manufacturing events" events={events?.manufacturing ?? []} />
         </section>
 
-        {/* ── Lane 3: Robot assembly ─────────────────────────────────── */}
+        {/* ── Lane 3: Worker robot assembly ─────────────────────────────────── */}
         <section className="flex-none" style={{ width: 380 }}>
           <div
             className="rounded-xl border border-[#E0E8F8] bg-white p-5"
