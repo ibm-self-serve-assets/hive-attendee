@@ -18,7 +18,7 @@ However, raw events tell you only what happened at an instant in time:
 
 **The Problem:** There is no single event that tells you how long a job actually took, whether it ran on schedule, or how workstation performance is trending across stages.
 
-**Your Objective:** As a stream processing engineer, you will use **Apache Flink on Confluent Cloud** to correlate unbounded event streams in real time. You will build an interval-join pipeline that pairs started and completed events by `job_id`, calculates job durations and outputs continuous, typed performance metrics to a unified `hive_job_durations` stream.
+**Your Objective:** As a stream processing engineer, you will use **Apache Flink on Confluent Cloud** to correlate unbounded event streams in real time. You will build an interval-join pipeline that pairs started and completed events by `job_id`, calculates job durations and outputs continuous, typed performance metrics to a unified `workstation_efficiency` stream.
 
 **Key Terminology:** Interval Joins, Stream-to-Stream Joins, Watermarks, Stream Windows
 
@@ -27,7 +27,7 @@ However, raw events tell you only what happened at an instant in time:
 ┌─────────────────────────┐
 │   *.started topic       ├──┐
 └─────────────────────────┘  │   Flink Stateful Join
-                             ├──► (matches on job_id)  ───►  hive_job_durations table & topic
+                             ├──► (matches on job_id)  ───►  workstation_efficiency table & topic
 ┌─────────────────────────┐  │   [within 1-min window]      (Schema Registry + Tableflow ready)
 │   *.completed topic     ├──┘
 └─────────────────────────┘
@@ -44,12 +44,12 @@ Your Simulation publishes raw JSON events across three production stages (define
 |---|---|---|---|
 | **Gathering** | `gathering-started` | `gathering-completed` | Resource extraction (pollen, nectar, wax) |
 | **Manufacturing** | `manufacturing-started` | `manufacturing-completed` | Component production at stations (frames, honeycombs) |
-| **Assembly** | `assembly-started` | `assembly-completed` | Final robot assembly lines |
+| **Assembly** | `assembly-started` | `assembly-completed` | Final worker assembly lines |
 
 Each event is wrapped in a standard envelope containing metadata (`occurred_at`, `sim_time_minutes`, `simulation_id`, `run_id`) and a `payload` containing `job_id` and the details of the job (resource, workstation or output).
 
-### 2. Output Stream (`hive_job_durations`)
-Flink will create a Kafka topic named `hive_job_durations` and publish a unified, append-only stream with these fields:
+### 2. Output Stream (`workstation_efficiency`)
+Flink will create a Kafka topic named `workstation_efficiency` and publish a unified, append-only stream with these fields:
 
 | Derived Metric / Field | Source / Calculation | Why It Matters |
 |---|---|---|
@@ -125,7 +125,7 @@ You will first configure your environment and run the pipeline using the **Confl
    <img src="screenshots/catalog_database_selection.png"/>
 
    - Click the Gear icon at top-right to edit your **Workspace Settings**:
-     - **Rename Your Workspace:** to **`hive_job_durations`**.
+     - **Rename Your Workspace:** to **`workstation_efficiency`**.
      - **Compute pool**: Select your newly created pool (e.g. `hive_compute_pool`).
      - **Save Changes**: DO NOT click the X to close this window.  You must click **Save Changes** (located at bottom-right of Workspace Settings)!
 
@@ -156,7 +156,7 @@ Before proceeding, ensure your Simulation Dashboard is:
    - **Snapshot** — runs once and returns a final result set. Correct for DDL statements like `CREATE TABLE`.
    - **Streaming** — keeps the statement alive as a continuous job. This is for DML queries like in the next step.
 4. Click **Run**.
-  - **What this does:** Registers the `hive_job_durations` table in Flink, generates the registered schema in Schema Registry, and creates the underlying Kafka topic with `append` changelog mode.
+  - **What this does:** Registers the `workstation_efficiency` table in Flink, generates the registered schema in Schema Registry, and creates the underlying Kafka topic with `append` changelog mode.
   - **Expected status:** **Completed**. This DDL statement executes once and finishes immediately.
 
 <img src="screenshots/create_hive_job_durations_table.png" width="75%" />
@@ -164,7 +164,7 @@ Before proceeding, ensure your Simulation Dashboard is:
 #### D. Deploy the Stream Processing Jobs
 1. Open [`flink/02_run_jobs.sql`](flink/02_run_jobs.sql).
 2. Copy the entire SQL statement, paste into the **second workspace cell** and click **Run**.
-  - **What this does:** Submits three continuous streaming jobs (gathering, manufacturing, assembly) bundled into a single Flink statement. Flink continuously joins incoming `started` and `completed` events and writes the correlated duration records into `hive_job_durations`.
+  - **What this does:** Submits three continuous streaming jobs (gathering, manufacturing, assembly) bundled into a single Flink statement. Flink continuously joins incoming `started` and `completed` events and writes the correlated duration records into `workstation_efficiency`.
   - **Expected status:** **Running**. Unlike the earlier DDL commands creating the Sink table, stream processing queries are continuous, long-running background jobs that stay active on your compute pool, listening for incoming Kafka events and calculating durations in real time.
   - Ignore the warning.  This is because the Simulation event producer is not using the Confluent's Schema Registry to keep this workshop simple to start.
 3. So do **NOT** click **Stop**.  Clicking the **Stop** button cancels and terminates your background Flink streaming pipeline.
@@ -182,7 +182,7 @@ Before proceeding, ensure your Simulation Dashboard is:
 <img src="screenshots/screenshot-16.png" width="75%" />
 
 #### F. Close this SQL workspace
-Scroll to the top of the SQL Workspace, find the tab at top-left marked **hive_job_durations** and click the **x** to close it, as you are done.  This will leave the 2nd SQL statement continuously processing your Kafka   stream.
+Scroll to the top of the SQL Workspace, find the tab at top-left marked **workstation_efficiency** and click the **x** to close it, as you are done.  This will leave the 2nd SQL statement continuously processing your Kafka   stream.
 
 <img src="screenshots/close_sql_workspace.png" width="25%" />
 
@@ -218,7 +218,7 @@ To inspect and verify your active streaming statement running on your compute po
 
 ### Step 3: Level 2 Dashboard Unlocked !!
 
-With the `hive_job_durations` Kafka topic being produced by Flink, you have unlocked access to Level 2. Go to your Hive Dashboard and select **Level 2**.  You can see the updated UI with Flink's calculations visible.  
+With the `workstation_efficiency` Kafka topic being produced by Flink, you have unlocked access to Level 2. Go to your Hive Dashboard and select **Level 2**.  You can see the updated UI with Flink's calculations visible.  
 
 We can see that the Resource Gathering stations are operating at different speeds while the Manufacturing and Assembly stations process one item each every 10 seconds (assuming resources and parts are available).  The progress spinners are calibrated to complete their cycles at same speed as their parent stations processing times.
 
@@ -240,7 +240,7 @@ The total # of gathered resources and manufactured parts are visible.  However R
 
 If you run the Simulation for 3 hours and 14 mins (3 mins and 14 seconds in real time), you'll observe Metals quickly becomes the bottleneck in production. All parts are manufactured at the rate of 1 item every 10 seconds.  Actuator fabrication and battery assembly are blocked most while waiting for scarce Metals. Electronics assembly is the fastest because electronics competes for the few rare resources.  
 
-If you run the Simulation longer, you will observe that actuators are the limiting input to robot assembly, with 8 actuators required per robot.  This means robot assembly is blocked most often because too few Metals are being produced.
+If you run the Simulation longer, you will observe that actuators are the limiting input to worker assembly, with 8 actuators required per robot.  This means worker assembly is blocked most often because too few Metals are being produced.
 
 <img src="screenshots/robot_assembly_blocked.png"/>
 

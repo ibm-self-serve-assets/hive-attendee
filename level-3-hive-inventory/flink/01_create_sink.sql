@@ -3,23 +3,23 @@
 -- =============================================================================
 --
 -- WHAT THIS DOES
---   Creates the `hive_inventory_balances` table.  Flink will maintain one row
+--   Creates the `resource_inventory` table.  Flink will maintain one row
 --   per (simulation_id, run_id, item_id, item_type) holding the current live
 --   quantity.  Each row is continuously updated as events arrive.
 --
 -- SCHEMA DESIGN
---   item_type  : 'resource' | 'part' | 'robot'
---   item_id    : station_id, part_id, or robot output_type
+--   item_type  : 'resource' | 'part'
+--   item_id    : station_id or part_id
 --   quantity   : running net balance (deliveries/completions minus consumption)
 --
--- WHY UPSERT (not append like hive_job_durations)
+-- WHY UPSERT (not append like workstation_efficiency)
 --   Inventory is a running balance — the same row is updated every time a
 --   delivery arrives or a workstation consumes inputs.  `changelog.mode = 'upsert'`
 --   means Flink emits an updated row for each key change.  The backing Kafka
 --   topic carries a full changelog (inserts + updates).  Tableflow materialises
 --   this as a live Iceberg snapshot of current inventory.
 --
---   Unlike hive_job_durations (append), once a topic has been touched by
+--   Unlike workstation_efficiency (append), once a topic has been touched by
 --   Tableflow its changelog mode is locked, so this is set correctly up front.
 --
 -- PRIMARY KEY
@@ -29,18 +29,18 @@
 --   which is what it uses by default.
 --
 -- BEFORE YOU RUN
---   * Complete Level 2 first (hive_job_durations must exist and be running).
+--   * Complete Level 2 first (workstation_efficiency must exist and be running).
 --   * In your SQL Workspace header: catalog = hive_dev, database = your cluster,
 --     compute pool = hive_compute_pool (or a new pool for Level 3).
 --   * Paste this file into a new workspace cell and click Run.
---   * Do NOT create the `hive_inventory_balances` topic yourself — Flink does it.
+--   * Do NOT create the `resource_inventory` topic yourself — Flink does it.
 -- =============================================================================
 
-CREATE TABLE `hive_inventory_balances` (
+CREATE TABLE `resource_inventory` (
   `simulation_id`  STRING,          -- Simulation this balance belongs to
   `run_id`      STRING,          -- Simulation run; resets when the Simulation restarts
-  `item_type`   STRING,          -- 'resource' | 'part' | 'robot'
-  `item_id`     STRING,          -- e.g. 'copper', 'chassis', 'engineer'
+  `item_type`   STRING,          -- 'resource' | 'part'
+  `item_id`     STRING,          -- e.g. 'copper', 'chassis'
   `quantity`    BIGINT,          -- current net stock (always >= 0 in a healthy sim)
   PRIMARY KEY (`simulation_id`, `run_id`, `item_type`, `item_id`) NOT ENFORCED
 )

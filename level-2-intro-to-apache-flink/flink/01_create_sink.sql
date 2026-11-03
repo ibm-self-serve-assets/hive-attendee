@@ -3,7 +3,7 @@
 -- =============================================================================
 --
 -- WHAT THIS DOES
---   Creates the `hive_job_durations` table. Flink will fill it in Step 2 with one row
+--   Creates the `workstation_efficiency` table. Flink will fill it in Step 2 with one row
 --   per finished job: how long it took between its "started" and "completed"
 --   events.
 --
@@ -13,7 +13,7 @@
 --   * Paste this file into a workspace cell and click Run.
 --
 -- NOTES
---   * Flink creates the backing Kafka topic `hive_job_durations` for you. Do not
+--   * Flink creates the backing Kafka topic `workstation_efficiency` for you. Do not
 --     create that topic yourself (for example with provision_topics.py).
 --   * 'json-registry' stores the table's schema in Schema Registry. Schema
 --     Registry must be enabled for the environment, and Tableflow needs the
@@ -23,15 +23,15 @@
 --     materialization and it cannot be changed later, so pick it up front.
 -- =============================================================================
 
-CREATE TABLE `hive_job_durations` (
+CREATE TABLE `workstation_efficiency` (
   `job_id`              STRING,           -- shared by the started and completed event
-  `simulation_id`          STRING,
+  `simulation_id`       STRING,
   `run_id`              STRING,
   `stage`               STRING,           -- gathering | manufacturing | assembly
   `started_topic`       STRING,           -- Kafka topic the started event came from
   `completed_topic`     STRING,           -- Kafka topic the completed event came from
-  `subject`             STRING,           -- station_id (gathering) or station_id
-  `output_type`           STRING,           -- what the job produced
+  `station_id`          STRING,           -- station_id (gathering) or station_id
+  `output_type`         STRING,           -- what the job produced
   `started_at`          TIMESTAMP(3),     -- wall-clock time of the started event (UTC)
   `completed_at`        TIMESTAMP(3),     -- wall-clock time of the completed event (UTC)
   `elapsed_sim_minutes` BIGINT,           -- simulated time between the two events in minutes (exact; 1 real second = 1 sim minute)

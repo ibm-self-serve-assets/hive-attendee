@@ -3,17 +3,16 @@
 -- =============================================================================
 --
 -- WHAT THIS DOES
---   Submits three continuous Flink aggregation jobs bundled into a single
+--   Submits two continuous Flink aggregation jobs bundled into a single
 --   statement set:
 --
 --     Job 1 — Resources  : gathering-completed deliveries minus
 --                          inputs consumed by manufacturing-started
 --     Job 2 — Parts      : manufacturing-completed output minus
 --                          inputs consumed by assembly-started
---     Job 3 — Robots     : assembly-completed accumulation (never consumed)
 --
 --   Each job maintains a running SUM keyed by (simulation_id, run_id, item_id)
---   and writes upsert rows to `hive_inventory_balances`.  The row for each
+--   and writes upsert rows to `resource_inventory`.  The row for each
 --   item is continuously updated as new events arrive.
 --
 -- BEFORE YOU RUN
@@ -42,7 +41,7 @@ BEGIN
 --   Inflows  : gathering-completed  (payload.station_id, payload.quantity)
 --   Outflows : manufacturing-started (payload.inputs.{energy,resin,metals,copper,silicon})
 -- ============================================================================
-INSERT INTO `hive_inventory_balances`
+INSERT INTO `resource_inventory`
 SELECT
   simulation_id,
   run_id,
@@ -119,7 +118,7 @@ GROUP BY simulation_id, run_id, item_id;
 --   Inflows  : manufacturing-completed (payload.part_id, payload.quantity)
 --   Outflows : assembly-started        (payload.inputs.{chassis,electronics,actuator,battery})
 -- ============================================================================
-INSERT INTO `hive_inventory_balances`
+INSERT INTO `resource_inventory`
 SELECT
   simulation_id,
   run_id,
@@ -180,24 +179,5 @@ FROM (
 
 )
 GROUP BY simulation_id, run_id, item_id;
-
--- ============================================================================
--- JOB 3: Robot inventory
---   Inflows only: assembly-completed (payload.output_type, payload.quantity)
---   Robots are never consumed.
--- ============================================================================
-INSERT INTO `hive_inventory_balances`
-SELECT
-  JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.simulation_id')                              AS simulation_id,
-  JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.run_id')                                  AS run_id,
-  'robot'                                                                         AS item_type,
-  JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.output_type')                       AS item_id,
-  SUM(CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.quantity') AS BIGINT))   AS quantity
-FROM `assembly-completed`
-WHERE JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.output_type') IS NOT NULL
-GROUP BY
-  JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.simulation_id'),
-  JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.run_id'),
-  JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.output_type');
 
 END;

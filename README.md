@@ -1,32 +1,35 @@
 # Welcome to The Hive
 
-<a href="assets/welcome_to_the_hive.png"><img src="assets/welcome_to_the_hive.png"/></a>
+**The Hive** is a hands-on workshop that expands on the familiar concept of **bee hives** to explore the powerful capabilities of event-driven architecture implemented with [Apache Kafka](https://www.confluent.io/resources/online-talk/getting-started-with-apache-kafka-r-and-real-time-data-streaming) and [Apache Flink](https://www.confluent.io/learn/apache-flink/) in [Confluent Cloud](https://confluent.cloud/).
 
-**The Hive** is a hands-on workshop where you monitor a robotic bee manufacturing Simulation.  Your bees gather resources, manufacture parts then assemble them into functional bees of different types: Gatherers, Engineers and Builders. Gatherer bees obtain the required Copper, Energy, Metals, Resin and Silicon required to maufacture the parts required to assemble your bees: Actuator, Battery, Chassis and Electronics.  You will ultimately assume the role as Queen of your robotic bee colony, assigning your bees to build new workstations and upgrade existing ones.  
+A bee hive is a useful analogy for understanding event-driven systems because, at the Hive's core, is the **Queen bee**; controlling the Hive while also being isolated from the various workings within the Hive.  The **Queen** makes all decisions to keep the Hive functioning properly by listening to abstracted Events communicated to it through pheromones and tactile communication with its **worker bees**. Likewise the Hive itself is an vertically-integrated manufacturing facility (think SpaceX, Tesla, Rivian, ...) so there are enterprise use case analogies to be learned from understanding how Hives function.
 
-To be efficient though, you must first obtain detailed insights into your production workflows including rates of resource gathering, time to manufacture parts, bottlenecks in available resources and efficiencies in assembling new robots from limited parts.  To gain insights into your robotic manufacturing Simulation, you'll connect real-time events into Apache Kafka on Confluent Cloud to generate real-time insight from your event stream. As your bees gather raw materials, manufactures parts and assembles robots, they are publishing detailed metadata at every step as a a live stream of events. Your job is to turn that stream of raw activity into something useful.
+<a href="images/welcome_to_the_hive.png"><img src="images/welcome_to_the_hive.png" width="35%"/></a>
 
-The Hive Workshop is structured as multiple Levels that you progress through while deploying Apache Flink SQL to correlate workstation start and completion events into production durations, maintain live inventory balances with stateful aggregations and validate continuously running pipelines as the Simulation keeps moving. In later levels, you'll store those streams in Apache Iceberg tables in Google BigQuery using Confluent Tableflow then hand the Simulation over to IBM Bob and Google Gemini to manage autonomously.
 
 ## Workshop Levels
-Head to **[Level 1 — Environment Setup](level-1-environment-setup/README.md)** to configure your Confluent Cloud environment, provision your Kafka topics, and launch the Hive Dashboard.
+Head to **[Level 1 — Getting Started](level-1-getting-started/README.md)** to learn about your personal Hive simulation, configure your development environment and expore your Hive Dashboard.
 
 | Level | Title | Focus |
 |---|---|---|
 | 1 | Environment Setup | Connect to Confluent Cloud, provision topics, launch the Hive Dashboard |
-| 2 | Intro to Apache Flink | Interval joins → job duration stream (`hive_job_durations`) |
-| 3 | Hive Inventory | Stateful aggregations → live inventory balances (`hive_inventory_balances`) |
-| 4 | Tableflow *(planned)* | Materialize streams as Apache Iceberg tables |
-| 5 | Headless Agent *(planned)* | Install IBM Bob in a headless agentic harness |
-| 6 | Bob Runs the Hive *(planned)* | IBM Bob manages the Simulation end-to-end |
+| 2 | Intro to Apache Flink | Interval joins → job duration stream (`workstation_efficiency`) |
+| 3 | Hive Inventory | Stateful aggregations → live inventory balances (`resource_inventory`) |
+| 4 | Queen's Orders | Event-sourced robot orders → live order queue (`queens_orders`) |
+| 5 | Tableflow *(planned)* | Materialize streams as Apache Iceberg tables |
+| 6 | Gamified UI *(planned)* | Play the Hive from a game-style dashboard |
+| 7 | Headless Agent *(planned)* | Install IBM Bob in a headless agentic harness |
+| 8 | Bob Runs the Hive *(planned)* | IBM Bob manages the Simulation end-to-end |
 
-## Architecture
+<img src="images/hive_dashboard.png"/>
 
-<a href="assets/hive_architecture.png"><img src="assets/hive_architecture.png"/></a>
+## Hive Architecture
+
+<a href="images/hive_architecture.png"><img src="images/hive_architecture.png"/></a>
 
 The HIVE platform is built around an event-driven architecture connecting a hosted Simulation engine, cloud-native streaming data pipelines, and a local attendee dashboard:
 
 1. **Simulation Server (Hosted Engine)**: Simulates the robotics manufacturing floor (gathering raw materials, fabricating parts, and assembling robots). It receives attendee lifecycle commands (Start, Pause, Stop, Restart) over HTTP REST and writes raw event logs directly to Confluent Cloud.
 2. **Confluent Cloud (Event Streaming Backbone)**: Provides managed Apache Kafka topics for each event type (e.g., `gathering-started`, `manufacturing-completed`, `simulation-state`), backed by Schema Registry for event contract governance.
-3. **Apache Flink SQL (Stream Processing)**: Continuously joins, enriches, and aggregates raw event streams in real time (calculating job durations and tracking live inventory balances), outputting enriched streams back to Kafka and downstream storage.
+3. **Apache Flink SQL (Stream Processing)**: Continuously joins, enriches, and aggregates raw event streams in real time (calculating job durations, tracking live inventory balances and folding the Queen's robot orders into a live queue), outputting enriched streams back to Kafka and downstream storage.
 4. **Attendee Dashboard (FastAPI Backend + React UI)**: Runs locally on your machine. The Python backend consumes events directly from your Confluent Cloud cluster and streams live state updates to the React frontend over Server-Sent Events (SSE).

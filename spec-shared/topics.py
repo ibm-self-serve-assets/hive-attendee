@@ -14,7 +14,7 @@ Consumers of this module use:
     TOPICS          – alias for BASE_TOPICS (used for publishing).
 
     STATE_TOPIC_SUFFIXES    – set of suffixes for state snapshot topics
-                      (".simulation-state", ".assembly-state")
+                      (".simulation-state")
 
     ACTIVITY_TOPIC_SUFFIXES – list of suffixes for every activity topic
                       (used for probe writes).
@@ -40,7 +40,7 @@ BASE_TOPICS: Dict[str, str] = _load("event_payloads_base.json")
 
 TOPICS: Dict[str, str] = BASE_TOPICS
 
-STATE_TOPIC_SUFFIXES: Set[str] = {".simulation-state", ".assembly-state"}
+STATE_TOPIC_SUFFIXES: Set[str] = {".simulation-state"}
 
 ACTIVITY_TOPIC_SUFFIXES: List[str] = [
     suffix for suffix in BASE_TOPICS if suffix not in STATE_TOPIC_SUFFIXES

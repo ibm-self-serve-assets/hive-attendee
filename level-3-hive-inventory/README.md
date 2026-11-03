@@ -2,7 +2,7 @@
 
 ## Overview & Goal
 
-In Level 2, you used Confluent Cloud's UI to execute SQL commands in Apache Flink that calcuated that `job-duration` for each Station in your manufacturing Simulation.  In Level 3, you will use the **Confluent CLI** to calculate teh **Live Inventory** for your Simulation: how many resources, parts, and robots are in stock or surplus.
+In Level 2, you used Confluent Cloud's UI to execute SQL commands in Apache Flink that calcuated that `job-duration` for each Station in your manufacturing Simulation.  In Level 3, you will use the **Confluent CLI** to calculate teh **Live Inventory** for your Simulation: how many resources and parts are in stock or surplus.
 
 **The Problem:** Raw Simulation events record only what was produced or consumed at a single instant.  There is no event that says "there are currently 7 units of copper in inventory."
 
@@ -10,20 +10,17 @@ In Level 2, you used Confluent Cloud's UI to execute SQL commands in Apache Flin
 
 - **Resources** arrive via `gathering.completed` and are consumed when manufacturing stations start jobs (`manufacturing.started` inputs).
 - **Parts** arrive via `manufacturing.completed` and are consumed when assembly starts (`assembly.started` inputs).
-- **Robots** accumulate via `assembly.completed` and are never consumed.
 
-### New Kafka Topic: hive_inventory_balances
+### New Kafka Topic: resource_inventory
 
 ```
 gathering-completed  ──┐
-                        ├──► Flink stateful SUM  ───►  hive_inventory_balances
+                        ├──► Flink stateful SUM  ───►  resource_inventory
 manufacturing-started ──┘        (per item_id)          (upsert changelog)
 
 manufacturing-completed ──┐ 
-                           ├──► Flink stateful SUM ───►  hive_inventory_balances
+                           ├──► Flink stateful SUM ───►  resource_inventory
 assembly-started ──────────┘
-
-assembly-completed ────────────► Flink stateful SUM ───►  hive_inventory_balances
 ```
 
 ### Why is this important in Event Streaming? (Stream vs. Table)
@@ -31,14 +28,14 @@ assembly-completed ────────────► Flink stateful SUM �
 A foundational concept in event-driven architecture is the **stream-table duality**: a stream represents a history of change (what happened), while a table represents the current state of the world (what is). 
 
 * **Append-Only Streams (Level 2):** Traditional Kafka topics are immutable, append-only event logs. Every single action (e.g., `+1 Copper added`, `-2 Copper consumed`) creates a new record. While great for auditing history, asking *"How much copper do we have in stock right now?"* would require a consumer to replay and sum every transaction from the beginning of time.
-* **Upsert Changelog / Materialized State (Level 3):** By configuring `hive_inventory_balances` with `changelog.mode = 'upsert'` and a primary key (`item_id`), Apache Flink turns the stream of delta events into a **live materialized table**.
+* **Upsert Changelog / Materialized State (Level 3):** By configuring `resource_inventory` with `changelog.mode = 'upsert'` and a primary key (`item_id`), Apache Flink turns the stream of delta events into a **live materialized table**.
 * **The Result:** Flink handles all the running sums in internal state and emits the latest balance per item. Downstream applications (like your UI dashboard) don't have to scan millions of historical events — they instantly read the current state of each item directly.
 
 ---
 
 ## Prerequisites
 
-- Level 2 is complete: `hive_job_durations` exists and the stream processing statement is **Running**.
+- Level 2 is complete: `workstation_efficiency` exists and the stream processing statement is **Running**.
 - The Simulation is running and events are flowing.
 - The Confluent CLI is installed (instructions below if not).
 
@@ -146,7 +143,7 @@ echo $env:ENV_ID/$env:CLUSTER_ID/$env:POOL_ID
 
 **NOTE:** Ensure your Terminal window is in the **Level 3 directory** when running the following commands.
 
-Create the `hive_inventory_balances` table in Flink and the backing Kafka topic with upsert changelog mode. 
+Create the `resource_inventory` table in Flink and the backing Kafka topic with upsert changelog mode. 
 
 ```bash
 confluent flink statement create hive-inventory-sink \
@@ -171,7 +168,7 @@ If the status is `FAILED`, the `status_detail` line explains why.
 
 ## Step 4 — Start the Inventory Jobs
 
-Run `02_run_jobs.sql` to start the continuous streaming statement. This submits three parallel aggregation jobs (resources, parts, robots) bundled into a single Flink statement.
+Run `02_run_jobs.sql` to start the continuous streaming statement. This submits two parallel aggregation jobs (resources, parts) bundled into a single Flink statement.
 
 ```bash
 confluent flink statement create hive-inventory-jobs \
@@ -204,7 +201,7 @@ Unlike the first DDL that you ran above, this DML statement runs indefinitely.
 >
 > This is the first time in the workshop we use it because it's the right tool for reading live output interactively — you can watch inventory values change in real time as the Simulation runs, which the shell handles naturally. Use it any time you want to inspect a Flink-managed topic, run a quick `SELECT`, or test a query before committing it to a permanent statement.
 
-The jobs from Step 4 are running, but nothing so far has shown you their output. In this step you'll use Flink Shell to read the `hive_inventory_balances` table to confirm that Flink is keeping a current stock count for every resource, part, and robot. The Simulation should be running so that you can see the numbers change.
+The jobs from Step 4 are running, but nothing so far has shown you their output. In this step you'll use Flink Shell to read the `resource_inventory` table to confirm that Flink is keeping a current stock count for every resource and part. The Simulation should be running so that you can see the numbers change.
 
 **1. Open the Flink shell.** This is an interactive window where you type SQL and see the results.
 ```bash
@@ -222,20 +219,20 @@ A `>` prompt appears when the shell is ready.
 <img src="screenshots/inventory_in_flink_shell.png"/>
 
 You should see:
-- one row for each of the 5 resources, 4 parts and 2 robots for the current run (11 rows);
+- one row for each of the 5 resources and 4 parts for the current run (9 rows);
 - quantities that change as the Simulation runs;
 - no negative numbers.
 - If you restarted the simulation, the table will show earlier runs too. Each run has its own `run_id`.
 
 **4. Congratulations! Level 3 Achieved!!!**
 
-Open your Hive Dashboard and select **Level 3.** Your Dashboard will now display an Inventory showing the same results as in the Flink Shell.  The Dashboard updates in near real-time — typically within a second of a new value being written — while the Flink Shell lags by up to a minute. Both are reading from the same `hive_inventory_balances` Kafka topic, but with different isolation levels. The dashboard backend uses `read_uncommitted`, so it sees records the moment Flink writes them. The Flink Shell uses `read_committed` (the default), so it only sees records after Flink's checkpoint transaction commits — which happens on the checkpoint interval, roughly once per minute on Confluent Cloud. The "Last Refresh" timer in the shell is just the shell's own display refresh rate, not an indicator of when new data arrived.
+Open your Hive Dashboard and select **Level 3.** Your Dashboard will now display an Inventory showing the same results as in the Flink Shell.  The Dashboard updates in near real-time — typically within a second of a new value being written — while the Flink Shell lags by up to a minute. Both are reading from the same `resource_inventory` Kafka topic, but with different isolation levels. The dashboard backend uses `read_uncommitted`, so it sees records the moment Flink writes them. The Flink Shell uses `read_committed` (the default), so it only sees records after Flink's checkpoint transaction commits — which happens on the checkpoint interval, roughly once per minute on Confluent Cloud. The "Last Refresh" timer in the shell is just the shell's own display refresh rate, not an indicator of when new data arrived.
 
 <img src="screenshots/inventory_in_ui.png"/>
 
 **4. Close the results and the shell.** Press `Q` to close the results. Then type `EXIT;` or press `Ctrl+D` to close the shell.
 
-> **Gate Check:** The dashboard Level 3 view unlocks once the `hive_inventory_balances` topic exists. Running `01_create_sink.sql` (Step 3) creates it.
+> **Gate Check:** The dashboard Level 3 view unlocks once the `resource_inventory` topic exists. Running `01_create_sink.sql` (Step 3) creates it.
 
 ---
 
@@ -256,12 +253,6 @@ parts[item_id] =
   − SUM(assembly-started.payload.inputs[item_id])
 ```
 Parts are produced by manufacturing completions and consumed when assembly stations start.
-
-### Robots
-```
-robots[output_type] = SUM(assembly-completed.payload.quantity  WHERE output_type = item_id)
-```
-Robots only accumulate at the moment — nothing consumes them.
 
 ---
 
@@ -306,8 +297,8 @@ You can drag the Lineage graph around using your mouse.  Zoom in/out using the b
 
 - **Node & Stream Inspection:** Click on any topic or stream edge in the lineage graph to view real-time throughput metrics (records/sec, bytes/sec), active schemas registered in Schema Registry, partition distributions, and consumer lag.
 - **Producer:** Topics flow from the Simulation producer and into the Flink Statements that you created. Click on the Topic icons in the Stream Lineage UI to trace events originating from the Simulation across raw topics such as `gathering-completed`, `manufacturing-started`, `manufacturing-completed`, `assembly-started`, and `assembly-completed`.
-- **Flink Statements:** Identify the Flink Statement nodes representing your running `hive-inventory-jobs` statement set (as well as Level 2's `hive_job_durations` joins).
-- **Derived Sink Topic:** Observe the flow routing into the `hive_inventory_balances` (the upsert changelog table) and `hive_job_durations` topics.
+- **Flink Statements:** Identify the Flink Statement nodes representing your running `hive-inventory-jobs` statement set (as well as Level 2's `workstation_efficiency` joins).
+- **Derived Sink Topic:** Observe the flow routing into the `resource_inventory` (the upsert changelog table) and `workstation_efficiency` topics.
 
 <img src="screenshots/lineage_flink_statements.png"/>
 
@@ -322,7 +313,7 @@ Click on a **Flink Statement** node to view useful useful stats like `Messages i
 ## Explore the Level 3 Dashboard
 
 ### Real-Time Inventory
-The Level 3 dashboard contains a real-time Inventory of available resources, parts and robots which is updated from your new `hive_inventory_balances` topic.  By observing the parts manufacturing events, you can see that `manufacturing-started` events coincide with the total resources being reduced by the required input amounts.  Likewise the parts inventory is seen to reduce when the `assembly-started` event appears, as expected.
+The Level 3 dashboard contains a real-time Inventory of available resources and parts which is updated from your new `resource_inventory` topic.  By observing the parts manufacturing events, you can see that `manufacturing-started` events coincide with the total resources being reduced by the required input amounts.  Likewise the parts inventory is seen to reduce when the `assembly-started` event appears, as expected.
 
 <img src="screenshots/inventory_in_ui.png"/>
 
@@ -338,17 +329,25 @@ In Level 2, you discovered the workstations were gathering resources and manufac
 
 ### Required Inputs
 
-You will also see that each manufacturing and robot assembly stations now show their required inputs.  This value is obtained from the `manufacturing-started` and `assembly-started` events.
+You will also see that each manufacturing and worker assembly stations now show their required inputs.  This value is obtained from the `manufacturing-started` and `assembly-started` events.
 
 <img src="screenshots/required_inputs.png"/>
 
-### Lavel 4: Order Fulfillment
+### Level 4: The Queen's Orders
 
-You may be asking yourself, what is the motivating force behind manufacturing these robots?  Where is the Queen that is managing the Hive?  Surely that Queen has placed order for them based on some prioritization.  Wouldn't a Queen need to assign workers to improve resource gathering to remove bottlenecks and can workstations be upgraded in some manner?
+You may be asking yourself, what is the motivating force behind manufacturing these robots?  Where is the Queen that is managing the Hive?  The Queen decides which robots the Hive builds: a Gatherer to speed up a gathering station, an Engineer to upgrade a manufacturing or assembly workstation from Tier 1 to 2 or Tier 2 to 3, or a Builder to build an new workstation (which starts at Tier 1).
 
-Level 4 introduces the concept of Order Fullfilment. You will use Flink to compute the back-propogation logic that connects incoming robot orders to prioritization of parts manufacturing.  Workstation upgrades and the ability to build new workstations gets you closer to handing over Hive management to the Queen, or your AI coding assistant.
+Level 4 introduces the Queen and her orders for additional workers. The Queen can place and cancel orders for new Workers plus assign them to specific tasks.  And as you guessed, Kafka event are generated to let us know about the Queen's requests:
+
+- `queen-robot-ordered`
+- `queen-robot-assigned`
+- `queen-robot-cancelled`
+
+Your task in Level 4 will be aggregating these into a new `queens_orders` topic to track progress of this activity.  Using Flink again, you will turn those events into a live queue that the assembly line works through, first in first out.  
+
+Andyes, handing the Queen's decisions over to your preferred AI coding assistant will occur in a later level.
 
 ## Next Step
 
-After exploring the updated Simulation Dashboard, proceed to [Level 4 - Order Fulfillment](../level-4-order-fulfillment/README.md). 
+After exploring the updated Simulation Dashboard, proceed to [Level 4 - Queen's Orders](../level-4-queens-orders/README.md). 
 

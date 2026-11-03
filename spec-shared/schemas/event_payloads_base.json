@@ -29,27 +29,19 @@
         },
         "simulation_config": {
           "type": "object",
-          "required": ["workstation_tiers", "robot_prices", "max_station_slots", "station_initial_tiers"],
+          "required": ["workstation_tiers", "station_initial_tiers"],
           "properties": {
             "workstation_tiers": {
               "type": "array",
               "items": {
                 "type": "object",
-                "required": ["tier", "cost_purchase", "cost_upgrade", "interval_sim_minutes"],
+                "required": ["tier", "interval_sim_minutes"],
                 "properties": {
                   "tier": { "type": "integer", "minimum": 1 },
-                  "cost_purchase": { "type": "integer", "minimum": 0 },
-                  "cost_upgrade": { "type": "integer" },
                   "interval_sim_minutes": { "type": "integer", "minimum": 1 }
                 }
               }
             },
-            "robot_prices": {
-              "type": "object",
-              "description": "robot_type → price_in_coins",
-              "additionalProperties": { "type": "integer", "minimum": 0 }
-            },
-            "max_station_slots": { "type": "integer", "minimum": 1 },
             "station_initial_tiers": {
               "type": "object",
               "description": "station_id → initial tier number",
@@ -170,11 +162,65 @@
       },
       "additionalProperties": false
     },
+    "queen.robot.ordered": {
+      "type": "object",
+      "description": "The Queen orders a robot. Orders wait in FIFO order until assembly.started takes them off the queue.",
+      "required": ["order_id", "robot_type", "station", "action"],
+      "properties": {
+        "order_id": { "type": "string", "format": "uuid" },
+        "robot_type": { "type": "string", "enum": ["engineer", "gatherer", "builder"] },
+        "station": {
+          "type": "string",
+          "description": "The workstation the robot will be applied to.",
+          "enum": ["resin", "silicon", "metals", "copper", "energy", "chassis", "electronics", "actuator", "battery", "engineer", "gatherer", "builder"]
+        },
+        "action": {
+          "type": "string",
+          "description": "'add' for a builder, 'upgrade' for a gatherer or engineer.",
+          "enum": ["upgrade", "add"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "queen.robot.assigned": {
+      "type": "object",
+      "description": "The Queen assigns a robot that was just built (follows assembly.completed, causation_id = the assembly.completed event). The station upgrade or addition is not applied yet.",
+      "required": ["order_id", "robot_type", "station", "action"],
+      "properties": {
+        "order_id": { "type": "string", "format": "uuid" },
+        "robot_type": { "type": "string", "enum": ["engineer", "gatherer", "builder"] },
+        "station": {
+          "type": "string",
+          "enum": ["resin", "silicon", "metals", "copper", "energy", "chassis", "electronics", "actuator", "battery", "engineer", "gatherer", "builder"]
+        },
+        "action": { "type": "string", "enum": ["upgrade", "add"] }
+      },
+      "additionalProperties": false
+    },
+    "queen.robot.cancelled": {
+      "type": "object",
+      "description": "The Queen cancels an order that is still in the queue. Orders already being assembled cannot be cancelled.",
+      "required": ["order_id", "robot_type", "station"],
+      "properties": {
+        "order_id": { "type": "string", "format": "uuid" },
+        "robot_type": { "type": "string", "enum": ["engineer", "gatherer", "builder"] },
+        "station": {
+          "type": "string",
+          "enum": ["resin", "silicon", "metals", "copper", "energy", "chassis", "electronics", "actuator", "battery", "engineer", "gatherer", "builder"]
+        }
+      },
+      "additionalProperties": false
+    },
     "assembly.started": {
       "type": "object",
       "required": ["job_id", "station_id", "output_type", "inputs"],
       "properties": {
         "job_id": { "type": "string", "format": "uuid" },
+        "order_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The Queen's order this robot fulfils. Starting assembly removes the order from the queue."
+        },
         "station_id": {
           "type": "string",
           "enum": ["engineer", "gatherer", "builder"]
@@ -195,6 +241,7 @@
       "required": ["job_id", "station_id", "output_type", "quantity"],
       "properties": {
         "job_id": { "type": "string", "format": "uuid" },
+        "order_id": { "type": "string", "format": "uuid" },
         "station_id": {
           "type": "string",
           "enum": ["engineer", "gatherer", "builder"]
@@ -235,17 +282,6 @@
           "type": "object",
           "description": "Parts removed from parts inventory in this transfer (delta, not cumulative).",
           "additionalProperties": { "type": "integer", "minimum": 1 }
-        }
-      },
-      "additionalProperties": false
-    },
-    "assembly.state": {
-      "type": "object",
-      "required": ["robot_queue"],
-      "properties": {
-        "robot_queue": {
-          "type": "array",
-          "items": { "type": "string" }
         }
       },
       "additionalProperties": false

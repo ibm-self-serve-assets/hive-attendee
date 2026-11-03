@@ -5,7 +5,7 @@
 -- WHAT THIS DOES
 --   Starts one continuous Flink statement that runs three jobs, one each for
 --   gathering, manufacturing and assembly. Each job pairs a "started" event with
---   its "completed" event and writes the time between them to `hive_job_durations`.
+--   its "completed" event and writes the time between them to `workstation_efficiency`.
 --
 -- BEFORE YOU RUN
 --   * Step 1 (01_create_sink.sql) has been run.
@@ -48,13 +48,13 @@ EXECUTE STATEMENT SET
 BEGIN
 
 -- ---- gathering: gathering-started -> gathering-completed --------------------
-INSERT INTO `hive_job_durations`
+INSERT INTO `workstation_efficiency`
 SELECT
   s.job_id, s.simulation_id, s.run_id,
   'gathering'                                         AS stage,
   'gathering-started'                                 AS started_topic,
   'gathering-completed'                               AS completed_topic,
-  s.subject, s.output_type,
+  s.station_id, s.output_type,
   s.occurred_at                                       AS started_at,
   c.occurred_at                                       AS completed_at,
   c.sim_time_minutes - s.sim_time_minutes             AS elapsed_sim_minutes,
@@ -64,7 +64,7 @@ FROM (
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.job_id')                              AS job_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.simulation_id')                                  AS simulation_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.run_id')                                      AS run_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                         AS subject,
+    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                         AS station_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                         AS output_type,
     CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.sim_time_minutes') AS BIGINT)           AS sim_time_minutes,
     CAST(REPLACE(REPLACE(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.occurred_at'), 'T', ' '), '+00:00', '') AS TIMESTAMP(3)) AS occurred_at,
@@ -83,13 +83,13 @@ JOIN (
   AND c.row_time BETWEEN s.row_time - INTERVAL '5' SECOND AND s.row_time + INTERVAL '1' MINUTE;
 
 -- ---- manufacturing: manufacturing-started -> manufacturing-completed --------
-INSERT INTO `hive_job_durations`
+INSERT INTO `workstation_efficiency`
 SELECT
   s.job_id, s.simulation_id, s.run_id,
   'manufacturing'                                     AS stage,
   'manufacturing-started'                             AS started_topic,
   'manufacturing-completed'                           AS completed_topic,
-  s.subject, s.output_type,
+  s.station_id, s.output_type,
   s.occurred_at                                       AS started_at,
   c.occurred_at                                       AS completed_at,
   c.sim_time_minutes - s.sim_time_minutes             AS elapsed_sim_minutes,
@@ -99,7 +99,7 @@ FROM (
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.job_id')                              AS job_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.simulation_id')                                  AS simulation_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.run_id')                                      AS run_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                          AS subject,
+    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                          AS station_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.output_type')                           AS output_type,
     CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.sim_time_minutes') AS BIGINT)           AS sim_time_minutes,
     CAST(REPLACE(REPLACE(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.occurred_at'), 'T', ' '), '+00:00', '') AS TIMESTAMP(3)) AS occurred_at,
@@ -118,13 +118,13 @@ JOIN (
   AND c.row_time BETWEEN s.row_time - INTERVAL '5' SECOND AND s.row_time + INTERVAL '1' MINUTE;
 
 -- ---- assembly: assembly-started -> assembly-completed -----------------------
-INSERT INTO `hive_job_durations`
+INSERT INTO `workstation_efficiency`
 SELECT
   s.job_id, s.simulation_id, s.run_id,
   'assembly'                                          AS stage,
   'assembly-started'                                  AS started_topic,
   'assembly-completed'                                AS completed_topic,
-  s.subject, s.output_type,
+  s.station_id, s.output_type,
   s.occurred_at                                       AS started_at,
   c.occurred_at                                       AS completed_at,
   c.sim_time_minutes - s.sim_time_minutes             AS elapsed_sim_minutes,
@@ -134,7 +134,7 @@ FROM (
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.job_id')                              AS job_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.simulation_id')                                  AS simulation_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.run_id')                                      AS run_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                          AS subject,
+    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                          AS station_id,
     JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.output_type')                           AS output_type,
     CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.sim_time_minutes') AS BIGINT)           AS sim_time_minutes,
     CAST(REPLACE(REPLACE(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.occurred_at'), 'T', ' '), '+00:00', '') AS TIMESTAMP(3)) AS occurred_at,
