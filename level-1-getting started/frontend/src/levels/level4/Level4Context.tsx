@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { DashboardState, SimulationConfig } from '../../types';
 
 const FALLBACK_INITIAL_TIERS: Record<string, number> = {
@@ -35,11 +35,20 @@ interface Level4ContextValue {
   upgradeStation: (key: string) => Promise<void>;
   orderRobot: (robotType: RobotType, station: string) => Promise<void>;
   cancelOrder: (orderId: string) => Promise<void>;
-  /** True while an order for `station` is waiting for the Queen to place it. */
-  isOrderPending: (station: string) => boolean;
+  /**
+   * True while an order for this `action` on `station` is active: just sent, waiting in the
+   * Queen's queue, or under assembly. The matching button is disabled meanwhile.
+   */
+  isOrderPending: (station: string, action: OrderAction) => boolean;
 }
 
 type RobotType = 'gatherer' | 'engineer' | 'builder';
+type OrderAction = 'add' | 'upgrade';
+
+/** A click is remembered this long if the order never shows up in queens_orders. */
+const SUBMITTED_TTL_MS = 20000;
+
+const orderKey = (station: string, action: OrderAction) => `${station}:${action}`;
 
 const GATHERING_STATIONS = new Set(['copper', 'energy', 'metals', 'resin', 'silicon']);
 
@@ -63,16 +72,61 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
 
   const configReady = cfg !== null;
 
+  // Orders that are in the Queen's queue or under assembly, by "station:action".
+  const activeKeys = useMemo(() => {
+    const active = [...(state.robot_queue ?? []), ...(state.orders_in_assembly ?? [])];
+    return new Set(active.map((o) => orderKey(o.station, o.action)));
+  }, [state.robot_queue, state.orders_in_assembly]);
+
+  // Orders just sent that have not reached queens_orders yet (Flink adds a short delay),
+  // so a second click cannot slip in. Value = when it was sent.
+  const [submitted, setSubmitted] = useState<Record<string, number>>({});
+
+  const clearSubmitted = (key: string) =>
+    setSubmitted((prev) => {
+      if (!(key in prev)) return prev;
+      const { [key]: _removed, ...rest } = prev;
+      return rest;
+    });
+
+  // Once the order shows up in the queue the real data takes over; drop the local marker.
+  useEffect(() => {
+    setSubmitted((prev) => {
+      const rest = Object.fromEntries(Object.entries(prev).filter(([k]) => !activeKeys.has(k)));
+      return Object.keys(rest).length === Object.keys(prev).length ? prev : rest;
+    });
+  }, [activeKeys]);
+
+  // Safety net: never leave a button disabled for good if an order is lost.
+  useEffect(() => {
+    const keys = Object.keys(submitted);
+    if (keys.length === 0) return;
+    const oldest = Math.min(...keys.map((k) => submitted[k]));
+    const timer = setTimeout(() => {
+      setSubmitted((prev) =>
+        Object.fromEntries(Object.entries(prev).filter(([, at]) => Date.now() - at < SUBMITTED_TTL_MS))
+      );
+    }, Math.max(0, SUBMITTED_TTL_MS - (Date.now() - oldest)) + 50);
+    return () => clearTimeout(timer);
+  }, [submitted]);
+
   const orderRobot = async (robotType: RobotType, station: string) => {
+    const action: OrderAction = robotType === 'builder' ? 'add' : 'upgrade';
+    const key = orderKey(station, action);
+    setSubmitted((prev) => ({ ...prev, [key]: Date.now() }));
     try {
       const r = await fetch('/api/order-robot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ robot_type: robotType, station }),
       });
-      if (!r.ok) console.error('Queen rejected the order:', await r.text());
+      if (!r.ok) {
+        console.error('Queen rejected the order:', await r.text());
+        clearSubmitted(key);
+      }
     } catch (err) {
       console.error('Failed to order robot:', err);
+      clearSubmitted(key);
     }
   };
 
@@ -91,9 +145,10 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
     }
   };
 
-  // TODO: return true while an order for `station` has been sent but has not yet appeared in
-  // queens_orders, so the button can be disabled meanwhile.
-  const isOrderPending = (_station: string) => false;
+  const isOrderPending = (station: string, action: OrderAction) => {
+    const key = orderKey(station, action);
+    return activeKeys.has(key) || key in submitted;
+  };
 
   return (
     <Level4Context.Provider

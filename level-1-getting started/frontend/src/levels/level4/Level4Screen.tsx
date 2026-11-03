@@ -119,7 +119,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
   const addStation = level4?.addStation ?? (() => Promise.resolve());
   const upgradeStation = level4?.upgradeStation ?? (() => Promise.resolve());
   const cancelOrder = level4?.cancelOrder ?? (() => Promise.resolve());
-  const isOrderPending = level4?.isOrderPending ?? (() => false);
+  const isOrderPending = level4?.isOrderPending ?? ((_station: string, _action: 'add' | 'upgrade') => false);
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -183,8 +183,8 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                 <button
                                   onClick={() => upgradeStation(id)}
                                   title="Assign a Gatherer to increase gathering speed"
-                                  disabled={isOrderPending(id)}
-                                  className={actionBtnClass(!isOrderPending(id))}
+                                  disabled={isOrderPending(id, 'upgrade')}
+                                  className={actionBtnClass(!isOrderPending(id, 'upgrade'))}
                                 >
                                   <svg width="14" height="20" viewBox="0 0 12 17" fill="none" aria-hidden="true"><path d="M6 14V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                   Gatherer
@@ -198,7 +198,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
-                              disabled={isOrderPending(id)}
+                              disabled={isOrderPending(id, 'add')}
                               size={50}
                             />
                             <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
@@ -207,8 +207,8 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                             <button
                               onClick={() => addStation(id)}
                               title="Assign a Builder to add a new gathering station"
-                              disabled={isOrderPending(id)}
-                              className={actionBtnClass(!isOrderPending(id))}
+                              disabled={isOrderPending(id, 'add')}
+                              className={actionBtnClass(!isOrderPending(id, 'add'))}
                             >
                               <svg width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                               Builder
@@ -286,8 +286,8 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                 <button
                                   onClick={() => upgradeStation(id)}
                                   title="Assign an Engineer to increase production"
-                                  disabled={isOrderPending(id)}
-                                  className={actionBtnClass(!isOrderPending(id))}
+                                  disabled={isOrderPending(id, 'upgrade')}
+                                  className={actionBtnClass(!isOrderPending(id, 'upgrade'))}
                                 >
                                   <svg width="14" height="20" viewBox="0 0 12 17" fill="none" aria-hidden="true"><path d="M6 14V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                   Engineer
@@ -301,7 +301,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
-                              disabled={isOrderPending(id)}
+                              disabled={isOrderPending(id, 'add')}
                               size={50}
                             />
                             <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
@@ -310,8 +310,8 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                             <button
                               onClick={() => addStation(id)}
                               title="Assign a Builder to add a new manufacturing station"
-                              disabled={isOrderPending(id)}
-                              className={actionBtnClass(!isOrderPending(id))}
+                              disabled={isOrderPending(id, 'add')}
+                              className={actionBtnClass(!isOrderPending(id, 'add'))}
                             >
                               <svg width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                               Builder
@@ -387,8 +387,8 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                 <button
                                   onClick={() => upgradeStation(station_id)}
                                   title="Assign an Engineer to increase production"
-                                  disabled={isOrderPending(station_id)}
-                                  className={actionBtnClass(!isOrderPending(station_id))}
+                                  disabled={isOrderPending(station_id, 'upgrade')}
+                                  className={actionBtnClass(!isOrderPending(station_id, 'upgrade'))}
                                 >
                                   <svg width="14" height="20" viewBox="0 0 12 17" fill="none" aria-hidden="true"><path d="M6 14V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                   Engineer
@@ -402,7 +402,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(station_id)}
-                              disabled={isOrderPending(station_id)}
+                              disabled={isOrderPending(station_id, 'add')}
                               size={50}
                             />
                             <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
@@ -411,8 +411,8 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                             <button
                               onClick={() => addStation(station_id)}
                               title="Assign a Builder to add a new assembly station"
-                              disabled={isOrderPending(station_id)}
-                              className={actionBtnClass(!isOrderPending(station_id))}
+                              disabled={isOrderPending(station_id, 'add')}
+                              className={actionBtnClass(!isOrderPending(station_id, 'add'))}
                             >
                               <svg width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                               Builder
