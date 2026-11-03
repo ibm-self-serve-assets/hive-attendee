@@ -594,7 +594,7 @@ def _raise_for_server_error(r: httpx.Response) -> None:
         raise HTTPException(status_code=r.status_code, detail=err_body)
 
 
-# The Queen's queue is not kept here: the server emits queen-robot-ordered / -cancelled events,
+# The Queen's queue is not kept here: the server emits queen-robot-ordered / -assigned events,
 # Flink folds them into the queens_orders topic, and QueensOrdersConsumer feeds the store.
 # These endpoints only forward the Queen's commands; the dashboard updates from the topic.
 @app.post("/api/order-robot")
@@ -613,19 +613,6 @@ async def order_robot(req: OrderRobotRequest):
             f"Queen: ordered '{req.robot_type}' for '{req.station}' -> order_id={receipt.get('order_id')}",
             extra=MAJOR,
         )
-        return receipt
-
-
-@app.delete("/api/orders/{order_id}")
-async def cancel_order(order_id: str):
-    _require_connection()
-    cmd_url = f"{config.simulation_server_url}/v1/simulations/{store.active_simulation_id}/orders/{order_id}"
-
-    async with httpx.AsyncClient(timeout=8.0) as client:
-        r = await client.delete(cmd_url, headers=_command_headers())
-        _raise_for_server_error(r)
-        receipt = r.json()
-        logger.info(f"Queen: cancelled order {order_id}", extra=MAJOR)
         return receipt
 
 

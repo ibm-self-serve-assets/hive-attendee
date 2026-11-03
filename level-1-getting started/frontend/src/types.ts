@@ -53,7 +53,7 @@ export interface QueenOrder {
   action: 'add' | 'upgrade';
   /** Queue position: event_sequence of the order. Lower is first. */
   placed_seq: number;
-  status: 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED' | 'CANCELLED';
+  status: 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED';
 }
 
 /** Shape of the state object sent from the backend SSE stream. */
@@ -69,7 +69,7 @@ export interface DashboardState {
   running: boolean;
   /** The Queen's open queue: OPEN orders in the order they were placed (from queens_orders, Level 4). */
   robot_queue?: QueenOrder[];
-  /** Orders whose robot is being built; they have left the queue and cannot be cancelled. */
+  /** Orders whose robot is being built; they have left the queue. */
   orders_in_assembly?: QueenOrder[];
 
   // Completed counts keyed by station_id / station_id / output_type

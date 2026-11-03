@@ -34,7 +34,6 @@ interface Level4ContextValue {
   /** Order a Gatherer (gathering station) or Engineer (any other station) to upgrade `key`. */
   upgradeStation: (key: string) => Promise<void>;
   orderRobot: (robotType: RobotType, station: string) => Promise<void>;
-  cancelOrder: (orderId: string) => Promise<void>;
   /**
    * True while an order for this `action` on `station` is active: just sent, waiting in the
    * Queen's queue, or under assembly. The matching button is disabled meanwhile.
@@ -136,15 +135,6 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
   const upgradeStation = (key: string) =>
     orderRobot(GATHERING_STATIONS.has(key) ? 'gatherer' : 'engineer', key);
 
-  const cancelOrder = async (orderId: string) => {
-    try {
-      const r = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { method: 'DELETE' });
-      if (!r.ok) console.error('Could not cancel the order:', await r.text());
-    } catch (err) {
-      console.error('Failed to cancel order:', err);
-    }
-  };
-
   const isOrderPending = (station: string, action: OrderAction) => {
     const key = orderKey(station, action);
     return activeKeys.has(key) || key in submitted;
@@ -159,7 +149,6 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
         addStation,
         upgradeStation,
         orderRobot,
-        cancelOrder,
         isOrderPending,
       }}
     >

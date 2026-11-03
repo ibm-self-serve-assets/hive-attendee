@@ -118,7 +118,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
   const maxStations = level4?.maxStations ?? 3;
   const addStation = level4?.addStation ?? (() => Promise.resolve());
   const upgradeStation = level4?.upgradeStation ?? (() => Promise.resolve());
-  const cancelOrder = level4?.cancelOrder ?? (() => Promise.resolve());
   const isOrderPending = level4?.isOrderPending ?? ((_station: string, _action: 'add' | 'upgrade') => false);
 
   return (
@@ -333,7 +332,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
         {/* ── Column 3: Worker robot assembly ─────────────────────────────────── */}
         <div className="flex-[3] flex flex-col gap-2 min-w-0">
           {/* The Queen's open orders */}
-          <AssemblyQueue queue={queue} cancelOrder={cancelOrder} />
+          <AssemblyQueue queue={queue} />
 
           {/* Floor */}
           <section>

@@ -9,10 +9,8 @@
 --
 --     OPEN         queen-robot-ordered     the Queen placed the order
 --     IN_ASSEMBLY  assembly-started        a robot is being built for it
---                                          (the order has left the queue and
---                                          can no longer be cancelled)
+--                                          (the order has left the queue)
 --     ASSIGNED     queen-robot-assigned    the finished robot was assigned
---     CANCELLED    queen-robot-cancelled   the Queen cancelled it while OPEN
 --
 -- SCHEMA DESIGN
 --   robot_type : 'gatherer' | 'engineer' | 'builder'
@@ -20,7 +18,7 @@
 --   action     : 'upgrade' (gatherer, engineer) | 'add' (builder)
 --   placed_seq : event_sequence of the ordered event.  Sort OPEN rows by this
 --                to get the Queen's first-in, first-out queue.
---   status     : 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED' | 'CANCELLED'
+--   status     : 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED'
 --
 -- WHY UPSERT (and not a per-item SUM like Level 3)
 --   The queue is an ordered list of individual orders, not a running total.
@@ -48,7 +46,7 @@ CREATE TABLE `queens_orders` (
   `station`       STRING,          -- workstation the robot will be applied to, e.g. 'resin'
   `action`        STRING,          -- 'upgrade' | 'add'
   `placed_seq`    BIGINT,          -- event_sequence of queen-robot-ordered (queue position)
-  `status`        STRING,          -- 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED' | 'CANCELLED'
+  `status`        STRING,          -- 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED'
   PRIMARY KEY (`simulation_id`, `run_id`, `order_id`) NOT ENFORCED
 )
 WITH (

@@ -14,7 +14,7 @@ In the queue above for the Queen's orders, we can see:
 
 The **Queen** decides which new Worker robots are required to improve the Hive and in what order. And she does this by publishing **events**.
 
-**The Problem:** The Queen's orders are separate events (`queen-robot-ordered`, `queen-robot-cancelled`, and so on).  No single event says "here is the queue right now".  To know what is waiting to be built, every event consumer would have to cache every order and subtract everything that was cancelled or also track the assembly status of Worker robots in the Assembly process.
+**The Problem:** The Queen's orders are separate events (`queen-robot-ordered`, `queen-robot-assigned`, and so on).  No single event says "here is the queue right now".  To know what is waiting to be built, every event consumer would have to cache every order and subtract the ones already in assembly or assigned, which means also tracking the assembly status of Worker robots in the Assembly process.
 
 **Your Objective:** Use Apache Flink to fold these events into a `queens_orders` table with one row per order.  Your Hive Dashboard can then read that table to draw the queue, so the queue on screen is nothing more than a view of your Flink output.
 
@@ -32,30 +32,35 @@ The Queen can order three kinds of Worker robots.  Each order names the workstat
 
 ### New Kafka Topics and Table
 
-Your Hive Simulation includes three Queen topics::
+Your Hive Simulation includes two Queen topics:
 
 | Topic | Written when |
 |---|---|
 | `queen-robot-ordered` | The Queen places an order. Carries `order_id`, `robot_type`, `station`, `action`. |
-| `queen-robot-cancelled` | The Queen cancels an order that is still in the queue. |
 | `queen-robot-assigned` | A robot finished assembly and was assigned. `causation_id` is the id of the `assembly-completed` event. |
 
 
-Note that we must also track when the Queen's orders have been processed.  The `assembly-started` topic triggers the removal of an order from the open order queue.  So your Flink SQL must process these 4 orders to track status of the Queen's order queue:
+Note that we must also track when the Queen's orders have been processed.  The `assembly-started` topic triggers the removal of an order from the open order queue.  So your Flink SQL must process these 3 topics to track status of the Queen's order queue:
 
 ```
 queen-robot-ordered ────┐
-assembly-started ───────┤
-                        ├──► Flink GROUP BY order_id ───►  queens_orders
-queen-robot-assigned ───┤        (highest rank wins)       (upsert changelog)
-queen-robot-cancelled ──┘
+assembly-started ───────┼──► Flink GROUP BY order_id ───►  queens_orders
+queen-robot-assigned ───┘   (highest lifecycle_stage wins)  (upsert changelog)
 ```
+
+Flink gives every event a `lifecycle_stage`, groups the events by `order_id`, and the highest `lifecycle_stage` seen for an order becomes its status:
+
+| Event | `lifecycle_stage` | Status |
+|---|---|---|
+| `queen-robot-ordered` | 1 | `OPEN` |
+| `assembly-started` (with an `order_id`) | 2 | `IN_ASSEMBLY` |
+| `queen-robot-assigned` | 3 | `ASSIGNED` |
 
 ---
 
 ## Why is this important in Event Streaming? (Event Sourcing)
 
-* **Commands become facts.** The Queen does not edit a queue.  She appends `ordered` and `cancelled` events, and each is a permanent record of what she decided and when.
+* **Commands become facts.** The Queen does not edit a queue.  She appends `ordered` events, and each is a permanent record of what she decided and when.
 * **State is derived.** The queue is a *projection* of those events.  Flink holds the running state and emits the latest row per order, exactly like the inventory balance in Level 3, but keyed by `order_id` instead of by item.
 * **Anyone can build their own view.** The dashboard reads `queens_orders`, but a different team could read the same `queen-robot-*` topics and build an audit trail or a fairness report, without any change to the Simulation.
 
@@ -96,7 +101,7 @@ The table has one row per order:
 | `station` | The workstation the robot is for, e.g. `resin` |
 | `action` | `upgrade` or `add` |
 | `placed_seq` | The `event_sequence` of the order. Lower means earlier in the queue. |
-| `status` | `OPEN`, `IN_ASSEMBLY`, `ASSIGNED` or `CANCELLED` |
+| `status` | `OPEN`, `IN_ASSEMBLY` or `ASSIGNED` |
 
 ---
 
@@ -106,21 +111,12 @@ Execute `02_run_jobs.sql` to start the continuous streaming statement.  It start
 
 ### How the Queue Is Computed
 
-The job reads four streams and gives every event a **rank**.  It groups the events by `order_id`, and the highest rank seen for an order becomes its status:
+The job applies the `lifecycle_stage` table from the overview above.  Two details are worth noticing:
 
-| Event | Rank | Status |
-|---|---|---|
-| `queen-robot-ordered` | 1 | `OPEN` |
-| `assembly-started` (with an `order_id`) | 2 | `IN_ASSEMBLY` |
-| `queen-robot-assigned` | 3 | `ASSIGNED` |
-| `queen-robot-cancelled` | 4 | `CANCELLED` |
-
-Two details are worth noticing:
-
-* **Rank makes the result order-independent.** Events from different topics can reach Flink in any order.  Taking the highest rank means an order never moves backwards, even if `assembly-started` arrives before `queen-robot-ordered`.
+* **`lifecycle_stage` makes the result order-independent.** Events from different topics can reach Flink in any order.  Taking the highest `lifecycle_stage` means an order never moves backwards, even if `assembly-started` arrives before `queen-robot-ordered`.
 * **`MAX()` fills the gaps.** Only some events carry `robot_type`, `station` and `action`.  `MAX()` ignores `NULL`, so whichever event brings a value fills it in.  `placed_seq` comes only from the ordered event.
 
-Cancelling is only possible while an order is `OPEN`.  Once `assembly-started` takes the order off the queue, the Simulation answers a cancel request with `422`, so `CANCELLED` never follows `IN_ASSEMBLY`.
+Orders cannot be cancelled: once the Queen places an order it stays until its robot is built and assigned.
 
 The **queue** on the dashboard is the rows with `status = 'OPEN'`, sorted by `placed_seq`: first in, first out.
 
@@ -133,7 +129,6 @@ Execute the query in `03_validate.sql`, either in a new cell of the Flink SQL Wo
 You should see:
 - On a fresh run, 8 rows, all `OPEN`: the Queen's initial orders.
 - Rows move to `IN_ASSEMBLY` as the assembly line starts building them, then to `ASSIGNED` once the robot is built.
-- A cancelled order shows `CANCELLED`.
 - If you restarted the Simulation, earlier runs are listed too.  Each run has its own `run_id`.
 
 When you have verified the results, stop this query (**Stop** in the UI, or press `Q` in the shell, then `EXIT;` or `Ctrl+D` to close it).  Only the `02_run_jobs.sql` statement needs to keep running.
@@ -157,10 +152,6 @@ Every workstation now has buttons that act as the Queen:
 * **Every station group:** the **Builder** button, next to the dashed hexagon, orders a **Builder** to add a station.
 
 Pressing a button sends one order to the Simulation as a `queen-robot-ordered` event.  The dashboard does **not** put the order in the queue itself.  It appears in the **Queen's Orders** only after the event has travelled through Flink into `queens_orders`, which is why there can be a moment between the click and the new icon.
-
-### Cancelling an Order
-
-Hover over a robot in the queue and click the **x** that appears to cancel the order.  This is allowed only while the order is `OPEN`.  When assembly starts, the robot leaves the queue and can no longer be cancelled.
 
 ### Watching the Status Change
 

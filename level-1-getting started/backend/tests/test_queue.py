@@ -30,7 +30,7 @@ def test_queue_holds_only_open_orders_sorted_by_placed_seq():
     store = _store()
     store.ingest_queens_order("run-1", _order("c", 30))
     store.ingest_queens_order("run-1", _order("a", 10))
-    store.ingest_queens_order("run-1", _order("b", 20, status="CANCELLED"))
+    store.ingest_queens_order("run-1", _order("b", 20, status="IN_ASSEMBLY"))
     store.ingest_queens_order("run-1", _order("d", 40, status="ASSIGNED"))
 
     assert [o["order_id"] for o in store.robot_queue] == ["a", "c"]

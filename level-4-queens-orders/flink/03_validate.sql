@@ -8,7 +8,7 @@
 --
 -- Expected on a fresh run: 8 rows, all OPEN, matching the Queen's initial
 -- orders.  Rows move to IN_ASSEMBLY as assembly starts, then to ASSIGNED when
--- the robot is built.  Cancelled orders show CANCELLED.
+-- the robot is built.
 --
 -- There is no ORDER BY on purpose.  This table is a live stream that keeps
 -- changing, and Flink cannot sort a stream by a regular column.  The dashboard

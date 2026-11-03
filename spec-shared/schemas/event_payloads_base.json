@@ -197,20 +197,6 @@
       },
       "additionalProperties": false
     },
-    "queen.robot.cancelled": {
-      "type": "object",
-      "description": "The Queen cancels an order that is still in the queue. Orders already being assembled cannot be cancelled.",
-      "required": ["order_id", "robot_type", "station"],
-      "properties": {
-        "order_id": { "type": "string", "format": "uuid" },
-        "robot_type": { "type": "string", "enum": ["engineer", "gatherer", "builder"] },
-        "station": {
-          "type": "string",
-          "enum": ["resin", "silicon", "metals", "copper", "energy", "chassis", "electronics", "actuator", "battery", "engineer", "gatherer", "builder"]
-        }
-      },
-      "additionalProperties": false
-    },
     "assembly.started": {
       "type": "object",
       "required": ["job_id", "station_id", "output_type", "inputs"],

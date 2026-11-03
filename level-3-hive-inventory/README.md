@@ -337,11 +337,10 @@ You will also see that each manufacturing and worker assembly stations now show 
 
 You may be asking yourself, what is the motivating force behind manufacturing these robots?  Where is the Queen that is managing the Hive?  The Queen decides which robots the Hive builds: a Gatherer to speed up a gathering station, an Engineer to upgrade a manufacturing or assembly workstation from Tier 1 to 2 or Tier 2 to 3, or a Builder to build an new workstation (which starts at Tier 1).
 
-Level 4 introduces the Queen and her orders for additional workers. The Queen can place and cancel orders for new Workers plus assign them to specific tasks.  And as you guessed, Kafka event are generated to let us know about the Queen's requests:
+Level 4 introduces the Queen and her orders for additional workers. The Queen can place orders for new Workers plus assign them to specific tasks.  And as you guessed, Kafka event are generated to let us know about the Queen's requests:
 
 - `queen-robot-ordered`
 - `queen-robot-assigned`
-- `queen-robot-cancelled`
 
 Your task in Level 4 will be aggregating these into a new `queens_orders` topic to track progress of this activity.  Using Flink again, you will turn those events into a live queue that the assembly line works through, first in first out.  
 

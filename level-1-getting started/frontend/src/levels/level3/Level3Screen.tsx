@@ -88,7 +88,6 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
   const queue = robot_queue ?? [];
   const level4 = useLevel4();
-  const cancelOrder = level4?.cancelOrder ?? (() => Promise.resolve());
   const stationSlots = level4?.stationSlots ?? {};
 
   /** Tier of a station's (single) workstation, and its duration label — same sources as Level 4. */
@@ -190,7 +189,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
         {/* ── Column 3: Worker robot assembly ───────────────────────────────────── */}
         <div className="flex-[3] flex flex-col gap-2 min-w-0">
           {/* The Queen's open orders */}
-          <AssemblyQueue queue={queue} cancelOrder={cancelOrder} />
+          <AssemblyQueue queue={queue} />
 
           {/* Floor */}
           <section>

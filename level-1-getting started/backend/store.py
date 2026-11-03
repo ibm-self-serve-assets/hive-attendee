@@ -102,7 +102,7 @@ class DashboardStore:
 
         # The Queen's orders from queens_orders (Flink output), kept per run:
         # run_id → order_id → {order_id, robot_type, station, action, placed_seq, status}
-        # status: 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED' | 'CANCELLED'
+        # status: 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED'
         # Independent of reset(): rows can arrive before the new run's first event does.
         self.orders_by_run: Dict[str, Dict[str, Dict[str, Any]]] = {}
 
@@ -377,7 +377,7 @@ class DashboardStore:
 
     @property
     def orders_in_assembly(self) -> List[Dict[str, Any]]:
-        """Orders whose robot is being built (they have left the queue and cannot be cancelled)."""
+        """Orders whose robot is being built (they have left the queue)."""
         return [dict(o) for o in self.queens_orders if o.get("status") == "IN_ASSEMBLY"]
 
     def get_stream_health(self) -> str:
