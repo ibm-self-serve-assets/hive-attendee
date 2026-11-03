@@ -4,7 +4,7 @@
 
 A bee hive is a useful analogy for understanding event-driven systems because, at the Hive's core, is the **Queen bee**; controlling the Hive while also being isolated from the various workings within the Hive.  The **Queen** makes all decisions to keep the Hive functioning properly by listening to abstracted Events communicated to it through pheromones and tactile communication with its **worker bees**. Likewise the Hive itself is an vertically-integrated manufacturing facility (think SpaceX, Tesla, Rivian, ...) so there are enterprise use case analogies to be learned from understanding how Hives function.
 
-<a href="images/welcome_to_the_hive.png"><img src="images/welcome_to_the_hive.png" width="35%"/></a>
+<a href="images/welcome_to_the_hive.png"><img src="images/welcome_to_the_hive.png"/></a>
 
 ## Workshop Levels
 Head to **[Level 1 — Getting Started](level-1-getting-started/README.md)** to learn about your personal Hive simulation, configure your development environment and expore your Hive Dashboard.
