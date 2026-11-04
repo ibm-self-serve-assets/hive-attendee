@@ -94,8 +94,8 @@ class DashboardStore:
         # station_id → latest elapsed_sim_minutes
         self.job_durations: Dict[str, int] = {}
 
-        # Inventory balances from resource_inventory (Flink output), kept per run
-        # because the topic retains rows from earlier runs:
+        # Inventory balances from resource_inventory & parts_inventory (Flink output), kept per run
+        # because the topics retain rows from earlier runs:
         # run_id → item_type → item_id → quantity.  item_type: 'resource' | 'part'
         # Independent of reset(): rows can arrive before the new run's first event does.
         self.inventory_by_run: Dict[str, Dict[str, Dict[str, int]]] = {}
@@ -109,7 +109,7 @@ class DashboardStore:
         # Recent events per section, newest first (raw envelopes for the event panels)
         self.events: Dict[str, list] = {c: [] for c in EVENT_LOG_CATEGORIES}
 
-        # Level 1 gate: every topic in spec-shared/schemas/event_payloads.json exists in Confluent.
+        # Level 1 gate: every event topic listed by the Simulation server (GET /v1/schemas) exists in Confluent.
         # `event_topics_missing` lists the absent topic names (empty until the first check completes).
         # Unlike the Flink gates this is re-evaluated continuously, so deleting topics re-locks Level 1.
         self.event_topics_ready: bool = False
@@ -120,7 +120,7 @@ class DashboardStore:
         # Independent of the Simulation run, so reset() leaves it alone.
         self.workstation_efficiency_ready: bool = False
 
-        # Level 3 gate: the resource_inventory topic exists. Re-evaluated continuously.
+        # Level 3 gate: resource_inventory & parts_inventory topics exist. Re-evaluated continuously.
         # Independent of the Simulation run, so reset() leaves it alone.
         self.resource_inventory_ready: bool = False
 
@@ -163,10 +163,6 @@ class DashboardStore:
 
     def ingest(self, env: EventEnvelope) -> bool:
         """Returns True if something changed."""
-        # Skip probes
-        if env.event_type == "connection.test":
-            return False
-
         # Simulation identity guard
         if self.active_simulation_id and env.simulation_id != self.active_simulation_id:
             return False

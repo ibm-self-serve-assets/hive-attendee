@@ -68,7 +68,7 @@ Flink gives every event a `lifecycle_stage`, groups the events by `order_id`, an
 
 ## Prerequisites
 
-- Level 3 is complete: `resource_inventory` exists and its statement is **Running**.
+- Level 3 is complete: `resource_inventory` and `parts_inventory` exist and their statements are **Running**.
 - The Simulation is running and events are flowing.
 - You know how to execute a Flink SQL script in Confluent Cloud, using either the **Confluent Cloud UI** (Level 2) or the **Confluent CLI** (Level 3).
 

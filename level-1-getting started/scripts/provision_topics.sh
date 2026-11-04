@@ -4,24 +4,28 @@
 # Creates (or verifies) the Confluent Cloud topics for this attendee.
 #
 # Configuration is read from spec-shared/.env (the shared env file at the repo root).
-# Fill in the four values there before running:
+# Fill in these values there before running:
 #
 #   CONFLUENT_REST_ENDPOINT=https://pkc-xxxxx.us-west-2.aws.confluent.cloud
 #   CONFLUENT_CLUSTER_ID=lkc-xxxxxx
-#   CONFLUENT_API_KEY=...
-#   CONFLUENT_API_SECRET=...
+#   KAFKA_CLUSTER_API_KEY=...
+#   KAFKA_CLUSTER_API_SECRET=...
+#   SIMULATION_SERVER_URL, WORKSHOP_ACCESS_TOKEN, ATTENDEE_ID   (from your instructor)
+#
+# The list of topics comes from your Simulation server (GET /v1/schemas).
+# Run ./register_schemas.sh afterwards to register their schemas.
 #
 # Usage:
 #   ./provision_topics.sh            # create topics
-#   ./provision_topics.sh --dry-run  # preview without making API calls
+#   ./provision_topics.sh --dry-run  # preview without creating anything
 #
 # This script:
 #   1. Creates (or reuses) a Python venv at .venv/
 #   2. Installs requirements.txt into the venv (idempotent, cached by pip)
 #   3. Runs provision_topics.py inside that venv using certifi for SSL
 #
-# Run from the level-1-environment-setup/scripts/ directory:
-#   cd level-1-environment-setup/scripts
+# Run from the scripts/ directory:
+#   cd "level-1-getting started/scripts"
 #   chmod +x provision_topics.sh
 #   ./provision_topics.sh
 

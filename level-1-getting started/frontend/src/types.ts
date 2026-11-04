@@ -94,7 +94,7 @@ export interface DashboardState {
   // station_id → elapsed_sim_minutes
   job_durations: Record<string, number>;
 
-  // Live inventory balances from the resource_inventory Flink topic (Level 3).
+  // Live inventory balances from the resource_inventory and parts_inventory Flink topics (Level 3).
   // inventory.resource / inventory.part → item_id → quantity
   inventory: {
     resource: Record<string, number>;
@@ -104,7 +104,7 @@ export interface DashboardState {
   // Recent raw events per section, newest first
   events: Record<EventSection, HiveEvent[]>;
 
-  // True when every topic in spec-shared/schemas/event_payloads.json exists in Confluent (unlocks Level 1)
+  // True when every event topic listed by the Simulation server exists in Confluent (unlocks Level 1)
   event_topics_ready: boolean;
   // Names of the event topics not yet present in Confluent
   event_topics_missing: string[];
@@ -112,7 +112,7 @@ export interface DashboardState {
   // True once the workstation_efficiency topic exists (created by the attendee's Flink SQL) (unlocks Level 2)
   workstation_efficiency_ready: boolean;
 
-  // True once the resource_inventory topic exists (created by the attendee's Flink SQL) (unlocks Level 3)
+  // True once the resource_inventory and parts_inventory topics exist (created by the attendee's Flink SQL) (unlocks Level 3)
   resource_inventory_ready: boolean;
 
   // True once the queens_orders topic exists (created by the attendee's Flink SQL) (unlocks Level 4)

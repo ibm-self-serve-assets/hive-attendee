@@ -30,12 +30,6 @@
 --   upsert mode Confluent requires the distribution key to equal the primary
 --   key, which is what it uses by default.
 --
--- BEFORE YOU RUN
---   * Complete Level 3 first.
---   * In your SQL Workspace header: catalog = hive_dev, database = your cluster,
---     compute pool = hive_compute_pool.
---   * Paste this file into a new workspace cell and click Run.
---   * Do NOT create the `queens_orders` topic yourself — Flink does it.
 -- =============================================================================
 
 CREATE TABLE `queens_orders` (

@@ -38,7 +38,7 @@ However, raw events tell you only what happened at an instant in time:
 ## What You Are Building
 
 ### 1. Input Streams
-Your Simulation publishes raw JSON events across three production stages (defined in [`spec-shared/schemas/event_payloads.json`](../spec-shared/schemas/event_payloads.json)):
+Your Simulation publishes JSON events across three production stages (their schemas come from your Simulation server, `GET /v1/schemas`). Every topic has a schema registered in Schema Registry by `register_schemas.sh` in Level 1, so Flink reads each event as typed columns (`simulation_id`, `run_id`, `occurred_at`, `sim_time_minutes` and a `payload` row) and your SQL needs no JSON parsing or casting:
 
 | Production Stage | Started Topic | Completed Topic | What It Represents |
 |---|---|---|---|
@@ -95,7 +95,7 @@ You will first configure your environment and run the pipeline using the **Confl
 
 1. **Create Your Flink Compute Pool**:
    - Click the Confluent icon in the top-left to return to Confluent Cloud's home page
-   - Select `hive_dev` from the **Environment** dropdown in the left nav bar.
+   - Select `hive_compute_pool` from the **Environment** dropdown in the left nav bar.
    - Click **Environment Overview**.
    - Then click into **Compute Pools**.
 
@@ -107,11 +107,11 @@ You will first configure your environment and run the pipeline using the **Confl
    <img src="screenshots/add_compute_pool.png"/>
 
    - Select **Google Cloud** as the provider and **Oregon (us-west)** as the region (or a region closer to you). Click **Continue**.
-   <img src="screenshots/select_google_cloud.png" alt="Select Region"/>
+   <img src="screenshots/select_google_cloud.png"/>
 
    - Rename your **Pool name** to `hive_compute_pool` and click **Create**.
 
-   <img src="screenshots/hive_compute_pool.png" alt="Review and Create"/>
+   <img src="screenshots/hive_compute_pool.png"/>
 
 2. **Flink SQL Workspace**:
    - From your Compute Pool screen, click **SQL Workspace** at the top.
@@ -166,7 +166,6 @@ Before proceeding, ensure your Simulation Dashboard is:
 2. Copy the entire SQL statement, paste into the **second workspace cell** and click **Run**.
   - **What this does:** Submits three continuous streaming jobs (gathering, manufacturing, assembly) bundled into a single Flink statement. Flink continuously joins incoming `started` and `completed` events and writes the correlated duration records into `workstation_efficiency`.
   - **Expected status:** **Running**. Unlike the earlier DDL commands creating the Sink table, stream processing queries are continuous, long-running background jobs that stay active on your compute pool, listening for incoming Kafka events and calculating durations in real time.
-  - Ignore the warning.  This is because the Simulation event producer is not using the Confluent's Schema Registry to keep this workshop simple to start.
 3. So do **NOT** click **Stop**.  Clicking the **Stop** button cancels and terminates your background Flink streaming pipeline.
   - After the next step, you will close this SQL Workspace while leaving this stream processing queries running in the background.
 

@@ -1,8 +1,8 @@
 import asyncio
-import json
 import logging
-from pathlib import Path
-from typing import Awaitable, Callable, List, Optional
+from typing import Awaitable, Callable, List, Optional, Tuple
+
+import httpx
 
 from backend.log_setup import MAJOR
 from backend.store import DashboardStore
@@ -19,17 +19,18 @@ except ImportError:
 
 POLL_SECONDS = 3.0
 
-_SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "spec-shared" / "schemas" / "event_payloads_base.json"
 
-
-def load_event_topic_names() -> List[str]:
+def fetch_event_topic_names(server_url: str, token: Optional[str], attendee_id: Optional[str]) -> List[str]:
     """
-    Topic names the Level 1 provisioning script creates: the keys of ``topics`` in
-    spec-shared/schemas/event_payloads.json with dots replaced by hyphens.
+    Topic names the Level 1 provisioning script creates: the ``topic`` of every entry the
+    Simulation server publishes at GET /v1/schemas. Raises on any failure.
     """
-    with _SCHEMA_PATH.open() as fh:
-        schema = json.load(fh)
-    return [key.replace(".", "-") for key in schema["topics"]]
+    headers = {"Authorization": f"Bearer {token}"}
+    if attendee_id:
+        headers["X-Attendee-Id"] = attendee_id
+    r = httpx.get(f"{server_url}/v1/schemas", headers=headers, timeout=8.0)
+    r.raise_for_status()
+    return [s["topic"] for s in r.json()["subjects"]]
 
 
 # Called with a level label when that level's gate goes from not met to met.
@@ -39,7 +40,7 @@ OnUnlocked = Callable[[str], Awaitable[None]]
 
 class EventTopicsWatcher:
     """
-    Polls Confluent Cloud for the Simulation event topics defined in event_payloads.json
+    Polls Confluent Cloud for the Simulation event topics listed by the Simulation server
     (created by Level 1's provision_topics.sh) and keeps `store.event_topics_ready` /
     `store.event_topics_missing` current. Only checks that topics exist; it never reads records.
     """
@@ -52,10 +53,14 @@ class EventTopicsWatcher:
         api_secret: Optional[str],
         on_change: Callable[[], Awaitable[None]],
         on_unlocked: Optional[OnUnlocked] = None,
+        topic_source: Optional[Callable[[], List[str]]] = None,
     ):
         self.store = store
         self.on_change = on_change
         self.on_unlocked = on_unlocked
+        # Returns the event topic names. Asked again on every poll until it succeeds once.
+        self._topic_source = topic_source
+        self._topics: Optional[List[str]] = None
         self._conf = {
             "bootstrap.servers": bootstrap_servers,
             "security.protocol": "SASL_SSL",
@@ -64,7 +69,7 @@ class EventTopicsWatcher:
             "sasl.password": api_secret,
             "enable.metrics.push": False,
         }
-        self._enabled = bool(KAFKA_AVAILABLE and bootstrap_servers and api_key and api_secret)
+        self._enabled = bool(KAFKA_AVAILABLE and bootstrap_servers and api_key and api_secret and topic_source)
         self._task: Optional[asyncio.Task] = None
 
     def start(self) -> None:
@@ -80,8 +85,11 @@ class EventTopicsWatcher:
     def _missing_topics(self) -> List[str]:
         # List all topics rather than asking for them by name, so a missing topic
         # is never auto-created by the metadata request.
-        # Re-read the schema every poll so edits to event_payloads.json apply without a restart.
-        topics = load_event_topic_names()
+        # The list comes from the Simulation server; ask once and keep it. If the server is
+        # not reachable yet this raises, the gate stays locked and the next poll tries again.
+        if self._topics is None:
+            self._topics = self._topic_source()
+        topics = self._topics
         meta = AdminClient(self._conf, logger=kafka_logger).list_topics(timeout=5)
         return [
             t for t in topics
@@ -187,10 +195,10 @@ class CalculatedValuesWatcher:
 
 class InventoryBalancesWatcher:
     """
-    Polls Confluent Cloud for the `resource_inventory` topic
-    (Flink creates it when the attendee runs 01_create_sink.sql for Level 3)
-    and keeps `store.resource_inventory_ready` current, so deleting the topic locks Level 3 again.
-    Only checks that the topic exists; it never reads records.
+    Polls Confluent Cloud for the `resource_inventory` and `parts_inventory` topics
+    (Flink creates them when the attendee runs 01_create_resource_sink.sql and 02_create_parts_sink.sql for Level 3)
+    and keeps `store.resource_inventory_ready` current, so deleting either topic locks Level 3 again.
+    Only checks that the topics exist; it never reads records.
     """
 
     def __init__(
@@ -200,11 +208,11 @@ class InventoryBalancesWatcher:
         api_key: Optional[str],
         api_secret: Optional[str],
         on_change: Callable[[], Awaitable[None]],
-        topic: str = "resource_inventory",
+        topics: Tuple[str, ...] = ("resource_inventory", "parts_inventory"),
         on_unlocked: Optional[OnUnlocked] = None,
     ):
         self.store = store
-        self.topic = topic
+        self.topics = topics
         self.on_change = on_change
         self.on_unlocked = on_unlocked
         self._conf = {
@@ -230,8 +238,10 @@ class InventoryBalancesWatcher:
 
     def _topic_exists(self) -> bool:
         meta = AdminClient(self._conf, logger=kafka_logger).list_topics(timeout=5)
-        topic_meta = meta.topics.get(self.topic)
-        return topic_meta is not None and topic_meta.error is None
+        return all(
+            meta.topics.get(t) is not None and meta.topics.get(t).error is None
+            for t in self.topics
+        )
 
     async def _run(self) -> None:
         was_ready: Optional[bool] = None  # None until the first successful check
@@ -240,9 +250,10 @@ class InventoryBalancesWatcher:
                 ready = await asyncio.to_thread(self._topic_exists)
                 if ready != self.store.resource_inventory_ready:
                     self.store.resource_inventory_ready = ready
+                    topics_str = ", ".join(self.topics)
                     logger.info(
-                        f"Level 3 unlocked: Topic {self.topic} exists" if ready
-                        else f"Level 3 locked: Topic {self.topic} is missing",
+                        f"Level 3 unlocked: Topics {topics_str} exist" if ready
+                        else f"Level 3 locked: Topics {topics_str} missing",
                         extra=MAJOR,
                     )
                     await self.on_change()

@@ -13,6 +13,9 @@ def make_config(**overrides) -> BackendConfig:
         confluent_bootstrap_server="pkc-abc12.us-west1.gcp.confluent.cloud:9092",
         confluent_api_key="KEY",
         confluent_api_secret="SECRET",
+        schema_registry_url="https://psrc-abc12.us-west1.gcp.confluent.cloud",
+        schema_registry_api_key="SR_KEY",
+        schema_registry_api_secret="SR_SECRET",
     )
     base.update(overrides)
     return BackendConfig(**base)
@@ -34,6 +37,24 @@ def test_real_values_are_not_placeholders(value):
     assert not is_placeholder(value)
 
 
+def test_load_from_env_reads_schema_registry_settings(monkeypatch, tmp_path):
+    env = tmp_path / ".env"
+    env.write_text(
+        "SCHEMA_REGISTRY_URL=https://psrc-abc12.us-west1.gcp.confluent.cloud/\n"
+        "SCHEMA_REGISTRY_API_KEY=SRKEY\n"
+        "SCHEMA_REGISTRY_API_SECRET=CHANGE_ME\n"
+    )
+    for name in ("SCHEMA_REGISTRY_URL", "SCHEMA_REGISTRY_API_KEY", "SCHEMA_REGISTRY_API_SECRET"):
+        # setenv first so monkeypatch restores (removes) the value load_dotenv writes into os.environ
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
+    cfg = BackendConfig.load_from_env(str(env))
+    assert cfg.schema_registry_url == "https://psrc-abc12.us-west1.gcp.confluent.cloud"
+    assert cfg.schema_registry_api_key == "SRKEY"
+    assert cfg.schema_registry_api_secret is None
+    assert "SCHEMA_REGISTRY_API_SECRET" in cfg.placeholder_vars
+
+
 def test_load_from_env_flags_placeholders(monkeypatch, tmp_path):
     env = tmp_path / ".env"
     env.write_text(
@@ -41,11 +62,11 @@ def test_load_from_env_flags_placeholders(monkeypatch, tmp_path):
         "WORKSHOP_ACCESS_TOKEN=<token_id>\n"
         "ATTENDEE_ID=queen-1\n"
         "CONFLUENT_BOOTSTRAP_SERVER=CHANGE_ME\n"
-        "CONFLUENT_API_KEY=KEY\n"
-        "CONFLUENT_API_SECRET=SECRET\n"
+        "KAFKA_CLUSTER_API_KEY=KEY\n"
+        "KAFKA_CLUSTER_API_SECRET=SECRET\n"
     )
     for name in ("SIMULATION_SERVER_URL", "WORKSHOP_ACCESS_TOKEN", "ATTENDEE_ID",
-                 "CONFLUENT_BOOTSTRAP_SERVER", "CONFLUENT_API_KEY", "CONFLUENT_API_SECRET"):
+                 "CONFLUENT_BOOTSTRAP_SERVER", "KAFKA_CLUSTER_API_KEY", "KAFKA_CLUSTER_API_SECRET"):
         monkeypatch.delenv(name, raising=False)
     cfg = BackendConfig.load_from_env(str(env))
     assert cfg.workshop_access_token is None
@@ -103,15 +124,31 @@ def test_missing_bootstrap():
 def test_missing_secret_names_only_that_variable():
     issues = ci.validate_config(make_config(confluent_api_secret=None))
     assert codes(issues) == ["confluent_credentials_missing"]
-    assert "CONFLUENT_API_SECRET" in issues[0].message
-    assert "CONFLUENT_API_KEY" not in issues[0].message
+    assert "KAFKA_CLUSTER_API_SECRET" in issues[0].message
+    assert "KAFKA_CLUSTER_API_KEY" not in issues[0].message
+
+
+def test_missing_schema_registry_settings_are_named():
+    issues = ci.validate_config(make_config(schema_registry_url=None, schema_registry_api_secret=None))
+    assert codes(issues) == ["schema_registry_missing"]
+    assert "SCHEMA_REGISTRY_URL" in issues[0].message
+    assert "SCHEMA_REGISTRY_API_SECRET" in issues[0].message
+    assert "SCHEMA_REGISTRY_API_KEY" not in issues[0].message
+
+
+def test_invalid_schema_registry_url():
+    issues = ci.validate_config(make_config(schema_registry_url="psrc-abc12.confluent.cloud"))
+    assert codes(issues) == ["schema_registry_url_invalid"]
 
 
 def test_everything_wrong_reports_everything():
     cfg = make_config(workshop_access_token=None, confluent_bootstrap_server=None,
-                      confluent_api_key=None, confluent_api_secret=None)
+                      confluent_api_key=None, confluent_api_secret=None,
+                      schema_registry_url=None, schema_registry_api_key=None,
+                      schema_registry_api_secret=None)
     assert set(codes(ci.validate_config(cfg))) == {
         "token_missing", "confluent_bootstrap_missing", "confluent_credentials_missing",
+        "schema_registry_missing",
     }
 
 

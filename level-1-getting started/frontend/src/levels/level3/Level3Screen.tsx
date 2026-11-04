@@ -3,7 +3,6 @@ import { EventPanel } from '../../components/EventPanel';
 import { FlowDots } from '../../components/FlowDots';
 import { HexagonTierBadge } from '../../components/HexagonTierBadge';
 import { GatheringStation } from '../../components/GatheringStation';
-import { AssemblyQueue } from '../../components/AssemblyQueue';
 import { useLevel4 } from '../level4/Level4Context';
 import type { LevelScreenProps } from '../types';
 
@@ -32,10 +31,10 @@ const InventoryItem: React.FC<{ icon: string; label: string; qty: number }> = ({
 const InputChip: React.FC<{ icon: string; qty: number; blocked?: boolean }> = ({ icon, qty, blocked }) => (
   <span className="inline-flex items-center gap-0.5" style={{ color: blocked ? '#C75000' : '#57606A' }}>
     <img
-      src={icon} width={18} height={18} alt=""
+      src={icon} width={22.5} height={22.5} alt=""
       style={{ objectFit: 'contain', opacity: blocked ? 1 : 0.85 }}
     />
-    <span className="text-xs font-semibold tabular-nums" style={{ fontSize: 11 }}>+{qty}</span>
+    <span className="text-xs font-semibold tabular-nums" style={{ fontSize: 13.75 }}>+{qty}</span>
   </span>
 );
 
@@ -76,10 +75,8 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
     assembly_inputs,
     inventory,
     events,
-    robot_queue,
   } = state;
 
-  const queue = robot_queue ?? [];
   const level4 = useLevel4();
   const stationSlots = level4?.stationSlots ?? {};
 
@@ -171,9 +168,6 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
         {/* ── Column 3: Worker robot assembly ───────────────────────────────────── */}
         <div className="flex-[3] flex flex-col gap-2 min-w-0">
-          {/* The Queen's open orders */}
-          <AssemblyQueue queue={queue} />
-
           {/* Floor */}
           <section>
             <div className="rounded-xl border border-[#E0E8F8] bg-white p-5" style={{ minHeight: 480 }}>

@@ -6,7 +6,8 @@ export const Level3Requirements: React.FC = () => (
     <img src="/icons/svg/lock.svg" width={96} height={96} alt="Locked" />
     <h2 className="mt-3 text-2xl font-bold text-[#031040]">Level 3 is locked</h2>
     <p className="mt-2 max-w-xs text-lg text-[#3A4A7A] leading-snug">
-      The <code className="font-mono text-[#031040]">resource_inventory</code> topic is not
+      The <code className="font-mono text-[#031040]">resource_inventory</code> and{' '}
+      <code className="font-mono text-[#031040]">parts_inventory</code> topics are not
       yet present in Confluent.
     </p>
     <p className="mt-2 max-w-xs text-sm text-[#57606A] leading-snug">

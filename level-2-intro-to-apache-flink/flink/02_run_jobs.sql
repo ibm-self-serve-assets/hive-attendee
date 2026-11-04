@@ -2,46 +2,23 @@
 -- STEP 2 of 2: start the jobs  (run this ONCE, as a single statement)
 -- =============================================================================
 --
--- WHAT THIS DOES
---   Starts one continuous Flink statement that runs three jobs, one each for
---   gathering, manufacturing and assembly. Each job pairs a "started" event with
---   its "completed" event and writes the time between them to `workstation_efficiency`.
+-- Starts one continuous Flink statement with three jobs (gathering,
+-- manufacturing, assembly). Each job matches a "started" event to its
+-- "completed" event by payload.job_id and writes the time between them to
+-- `workstation_efficiency`.
 --
--- BEFORE YOU RUN
---   * Step 1 (01_create_sink.sql) has been run.
---   * Same SQL workspace context as Step 1 (catalog, database, compute pool).
---   * Click "+" to create a new SQL cell below, paste this entire file, and click Run.
---   * The EXECUTE STATEMENT SET ... BEGIN ... END block bundles all three stage
---     jobs into a single continuous statement.
---   * Once it reaches "Running", you can delete (trash icon) the cell card to keep
---     your workspace clean; the job continues running 24/7 in the background.
+-- Before you run: Step 1 is done and you are in the same SQL workspace context.
+-- Paste this entire file into a new SQL cell and click Run. Once it shows
+-- "Running", you can delete the cell; the job keeps running in the background.
 --
--- HOW EACH JOB WORKS
---   1. The server publishes plain JSON, so Flink sees `key` and `val` as raw
---      bytes. MAKE_VALID_UTF8(`val`) turns the bytes into a string that
---      JSON_VALUE can read, replacing any invalid UTF-8 bytes.
---   2. A started event and a completed event belong together when their
---      payload.job_id is equal. Probe events (connection.test) have no job_id,
---      so they never match and are ignored.
---   3. The join only looks for a completed event from 5 seconds before to
---      1 minute after the started event (Kafka record time). Jobs normally
---      take 5-15 s, so this keeps Flink's memory small. A started event with no
---      completed event in that window produces no row.
---      If you slow the Simulation down so jobs take over a minute, widen the
---      "+ INTERVAL '1' MINUTE" bound.
+-- The join only looks for a completed event from 5 seconds before to 1 minute
+-- after the started event. Jobs normally take 5-15 s. If you slow the
+-- Simulation down so jobs take over a minute, widen the INTERVAL '1' MINUTE.
 --
--- WHAT THE OUTPUT NUMBERS MEAN
---   elapsed_sim_minutes  completed.sim_time_minutes - started.sim_time_minutes.
---                        Exact sim-time difference in minutes. 1 real second = 1
---                        sim minute, so this equals elapsed wall seconds.
---   elapsed_wall_s       real seconds between the two occurred_at timestamps.
---
--- Only values from the events themselves are used (no NOW(), UUID(), RAND()),
--- so replaying the same events gives the same rows.
---
--- Event fields used (see spec-shared/schemas/event_payloads.json):
---   envelope : simulation_id, run_id, occurred_at, sim_time_minutes
---   payload  : job_id, station_id / station_id / output_type
+-- Output columns:
+--   elapsed_sim_minutes  completed.sim_time_minutes - started.sim_time_minutes
+--   elapsed_wall_s       real seconds between the two occurred_at timestamps
+-- (1 real second = 1 sim minute, so the two values are equal.)
 -- =============================================================================
 
 EXECUTE STATEMENT SET
@@ -61,22 +38,22 @@ SELECT
   TIMESTAMPDIFF(SECOND, s.occurred_at, c.occurred_at) AS elapsed_wall_s
 FROM (
   SELECT
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.job_id')                              AS job_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.simulation_id')                                  AS simulation_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.run_id')                                      AS run_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                         AS station_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                         AS output_type,
-    CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.sim_time_minutes') AS BIGINT)           AS sim_time_minutes,
-    CAST(REPLACE(REPLACE(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.occurred_at'), 'T', ' '), '+00:00', '') AS TIMESTAMP(3)) AS occurred_at,
-    `$rowtime`                                                                         AS row_time
+    payload.job_id                      AS job_id,
+    simulation_id,
+    run_id,
+    payload.station_id                  AS station_id,
+    payload.station_id                  AS output_type,   -- gathering has no output_type; the station names the resource
+    sim_time_minutes,
+    TO_TIMESTAMP(REPLACE(SUBSTR(occurred_at, 1, 19), 'T', ' ')) AS occurred_at,
+    `$rowtime`                          AS row_time
   FROM `gathering-started`
 ) AS s
 JOIN (
   SELECT
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.job_id')                              AS job_id,
-    CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.sim_time_minutes') AS BIGINT)           AS sim_time_minutes,
-    CAST(REPLACE(REPLACE(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.occurred_at'), 'T', ' '), '+00:00', '') AS TIMESTAMP(3)) AS occurred_at,
-    `$rowtime`                                                                         AS row_time
+    payload.job_id                      AS job_id,
+    sim_time_minutes,
+    TO_TIMESTAMP(REPLACE(SUBSTR(occurred_at, 1, 19), 'T', ' ')) AS occurred_at,
+    `$rowtime`                          AS row_time
   FROM `gathering-completed`
 ) AS c
   ON  s.job_id = c.job_id
@@ -96,22 +73,22 @@ SELECT
   TIMESTAMPDIFF(SECOND, s.occurred_at, c.occurred_at) AS elapsed_wall_s
 FROM (
   SELECT
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.job_id')                              AS job_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.simulation_id')                                  AS simulation_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.run_id')                                      AS run_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                          AS station_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.output_type')                           AS output_type,
-    CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.sim_time_minutes') AS BIGINT)           AS sim_time_minutes,
-    CAST(REPLACE(REPLACE(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.occurred_at'), 'T', ' '), '+00:00', '') AS TIMESTAMP(3)) AS occurred_at,
-    `$rowtime`                                                                         AS row_time
+    payload.job_id                      AS job_id,
+    simulation_id,
+    run_id,
+    payload.station_id                  AS station_id,
+    payload.output_type                 AS output_type,
+    sim_time_minutes,
+    TO_TIMESTAMP(REPLACE(SUBSTR(occurred_at, 1, 19), 'T', ' ')) AS occurred_at,
+    `$rowtime`                          AS row_time
   FROM `manufacturing-started`
 ) AS s
 JOIN (
   SELECT
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.job_id')                              AS job_id,
-    CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.sim_time_minutes') AS BIGINT)           AS sim_time_minutes,
-    CAST(REPLACE(REPLACE(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.occurred_at'), 'T', ' '), '+00:00', '') AS TIMESTAMP(3)) AS occurred_at,
-    `$rowtime`                                                                         AS row_time
+    payload.job_id                      AS job_id,
+    sim_time_minutes,
+    TO_TIMESTAMP(REPLACE(SUBSTR(occurred_at, 1, 19), 'T', ' ')) AS occurred_at,
+    `$rowtime`                          AS row_time
   FROM `manufacturing-completed`
 ) AS c
   ON  s.job_id = c.job_id
@@ -131,22 +108,22 @@ SELECT
   TIMESTAMPDIFF(SECOND, s.occurred_at, c.occurred_at) AS elapsed_wall_s
 FROM (
   SELECT
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.job_id')                              AS job_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.simulation_id')                                  AS simulation_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.run_id')                                      AS run_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.station_id')                          AS station_id,
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.output_type')                           AS output_type,
-    CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.sim_time_minutes') AS BIGINT)           AS sim_time_minutes,
-    CAST(REPLACE(REPLACE(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.occurred_at'), 'T', ' '), '+00:00', '') AS TIMESTAMP(3)) AS occurred_at,
-    `$rowtime`                                                                         AS row_time
+    payload.job_id                      AS job_id,
+    simulation_id,
+    run_id,
+    payload.station_id                  AS station_id,
+    payload.output_type                 AS output_type,
+    sim_time_minutes,
+    TO_TIMESTAMP(REPLACE(SUBSTR(occurred_at, 1, 19), 'T', ' ')) AS occurred_at,
+    `$rowtime`                          AS row_time
   FROM `assembly-started`
 ) AS s
 JOIN (
   SELECT
-    JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.payload.job_id')                              AS job_id,
-    CAST(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.sim_time_minutes') AS BIGINT)           AS sim_time_minutes,
-    CAST(REPLACE(REPLACE(JSON_VALUE(MAKE_VALID_UTF8(`val`), '$.occurred_at'), 'T', ' '), '+00:00', '') AS TIMESTAMP(3)) AS occurred_at,
-    `$rowtime`                                                                         AS row_time
+    payload.job_id                      AS job_id,
+    sim_time_minutes,
+    TO_TIMESTAMP(REPLACE(SUBSTR(occurred_at, 1, 19), 'T', ' ')) AS occurred_at,
+    `$rowtime`                          AS row_time
   FROM `assembly-completed`
 ) AS c
   ON  s.job_id = c.job_id

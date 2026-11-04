@@ -13,7 +13,7 @@ Head to **[Level 1 — Getting Started](level-1-getting-started/README.md)** to 
 |---|---|---|
 | 1 | Environment Setup | Connect to Confluent Cloud, provision topics, launch the Hive Dashboard |
 | 2 | Intro to Apache Flink | Interval joins → job duration stream (`workstation_efficiency`) |
-| 3 | Hive Inventory | Stateful aggregations → live inventory balances (`resource_inventory`) |
+| 3 | Hive Inventory | Stateful aggregations → live inventory balances (`resource_inventory`, `parts_inventory`) |
 | 4 | Queen's Orders | Event-sourced robot orders → live order queue (`queens_orders`) |
 | 5 | Part Prioritization *(planned)* | Join the Queen's queue with recipe inputs → parts manufacturing queue |
 | 6 | Gamified UI *(planned)* | Play the Hive from a game-style dashboard |

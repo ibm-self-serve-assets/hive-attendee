@@ -71,10 +71,10 @@ const InventoryItem: React.FC<{ icon: string; label: string; qty: number }> = ({
 const InputChip: React.FC<{ icon: string; qty: number; blocked?: boolean }> = ({ icon, qty, blocked }) => (
   <span className="inline-flex items-center gap-0.5" style={{ color: blocked ? '#C75000' : '#57606A' }}>
     <img
-      src={icon} width={18} height={18} alt=""
+      src={icon} width={22.5} height={22.5} alt=""
       style={{ objectFit: 'contain', opacity: blocked ? 1 : 0.85 }}
     />
-    <span className="text-xs font-semibold tabular-nums" style={{ fontSize: 11 }}>+{qty}</span>
+    <span className="text-xs font-semibold tabular-nums" style={{ fontSize: 13.75 }}>+{qty}</span>
   </span>
 );
 

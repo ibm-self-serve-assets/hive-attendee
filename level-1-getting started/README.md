@@ -1,4 +1,4 @@
-# Level 1: Getting Started
+# Level 1: Getting Started (45 mins)
 
 Welcome to Level 1.  The Hive Workshop is structured into multiple Levels where you apply event-driven best practices to unlock the complexity of your Hive's inner workings.  If you haven't already, read the [README.md](../README.md) as it provides a high-level intro to the **Hive Workshop**.
 
@@ -74,6 +74,8 @@ Just as different sets of **Resources** are required to manufacture different **
 
 As bees in your Hive gather raw materials, manufactures parts and assembles robots, they are publishing detailed metadata at every step in a live stream of events. You will analyze your Simulation's event stream to fully understand the dynamics of your vertically-integrated robotics manufacturing workflow.  Your job is to turn that stream of raw activity into something useful and understood.
 
+Every event follows a published **schema** (a data contract) kept in Confluent **Schema Registry**, so you, the dashboard and Apache Flink can all rely on the same fields and types. [Step 4](#why-use-schema-registry) explains why this matters.
+
 You will discover the Hive's subsystems within your Hive operate with different efficiencies. Bottlenecks limit the productivity of your Hive.  
 
 You must investigate your Hive's event stream to correlate production start and completion events to calculate efficiency metrics, maintain live inventory balances of newly built worker bees and their required parts using stateful aggregations and ultimately manage your Hive's continuously running production pipelines. Eventually, you'll hand over the curated event stream to IBM Bob and Google Gemini. As an **AI Queen**, they will autonomously optimize your Hive to build and delegate your Workers efficiently. 
@@ -132,11 +134,11 @@ Make sure you have:
 1. Log in to [Confluent Cloud](https://confluent.cloud).
 2. Click your **Account** icon in the top-right and enable Confluent Cloud's new UI, if not already active.  If you don't have the new UI enabled, the screenshots in all documents will not match your own screen.
 
-<img src="images/enable_new_UI.png" />
+<img src="images/enable_new_UI.png"/>
 
 3. In the left navigation, select **Environments**, then click **+ Add cloud environment**.
 4. Enter `hive_dev` as the **Environment name**.
-5. Under **Stream Governance package**, leave **Essentials** selected (starts at Free). This turns on **Schema Registry**, which Level 2 and Level 3 need.
+5. Under **Stream Governance package**, leave **Essentials** selected (starts at Free). This turns on **Schema Registry**, which holds the data contract for every event topic. The Simulation, your dashboard and Flink (Levels 2 to 4) all depend on it ([why](#why-use-schema-registry)).
 6. Click **Create**.
 
 <img src="images/confluent_create_environment.png" />
@@ -179,29 +181,44 @@ The backend and topic provisioning scripts read configuration from `spec-shared/
    | Value | Why it is needed | Where it is used |
    |---|---|---|
    | `CONFLUENT_BOOTSTRAP_SERVER` | The address of your Kafka cluster. | Sent to the Simulation when your dashboard registers your Simulation ([`backend/app.py`](backend/app.py#L160-L168)). Used to open the dashboard's Kafka connections ([`backend/consumer.py`](backend/consumer.py#L74-L83), [`backend/topic_watch.py`](backend/topic_watch.py#L50-L56)). |
-   | `CONFLUENT_API_KEY` and `CONFLUENT_API_SECRET` | Authenticate to your cluster. | Sent to the Simulation in the same registration request so it can publish your events ([`backend/app.py`](backend/app.py#L160-L168)). Used by the dashboard to read events and check that your topics exist ([`backend/consumer.py`](backend/consumer.py#L74-L83), [`backend/topic_watch.py`](backend/topic_watch.py#L50-L56)). Also used by the topic provisioning script in [Step 4](#step-4-provision-your-kafka-topics) ([`provision_topics.py`](scripts/provision_topics.py#L197-L200)). |
-   | `CONFLUENT_REST_ENDPOINT` and `CONFLUENT_CLUSTER_ID` | Address the Confluent REST API for your cluster. | Only used by the script in [Step 4](#step-4-provision-your-kafka-topics) that creates your topics ([`provision_topics.py`](scripts/provision_topics.py#L197-L200)). |
+   | `KAFKA_CLUSTER_API_KEY` and `KAFKA_CLUSTER_API_SECRET` | Authenticate to your cluster. | Sent to the Simulation in the same registration request so it can publish your events ([`backend/app.py`](backend/app.py#L160-L168)). Used by the dashboard to read events and check that your topics exist ([`backend/consumer.py`](backend/consumer.py#L74-L83), [`backend/topic_watch.py`](backend/topic_watch.py#L50-L56)). Also used by the topic provisioning script in [Step 4](#step-4-provision-your-kafka-topics-and-register-their-schemas) ([`provision_topics.py`](scripts/provision_topics.py#L197-L200)). |
+   | `CONFLUENT_REST_ENDPOINT` and `CONFLUENT_CLUSTER_ID` | Address the Confluent REST API for your cluster. | Only used by the script in [Step 4](#step-4-provision-your-kafka-topics-and-register-their-schemas) that creates your topics ([`provision_topics.py`](scripts/provision_topics.py#L197-L200)). |
+   | `SCHEMA_REGISTRY_URL`, `SCHEMA_REGISTRY_API_KEY` and `SCHEMA_REGISTRY_API_SECRET` | The address of your Schema Registry and its own API key. This is a different key from the Kafka cluster key. | Sent to the Simulation in the registration request, so it can check that your schemas are registered and write each event with its schema ([`backend/app.py`](backend/app.py)). Used by the dashboard to read those events ([`backend/consumer.py`](backend/consumer.py)). Also used by the schema script in [Step 4](#step-4-provision-your-kafka-topics-and-register-their-schemas) ([`register_schemas.py`](scripts/register_schemas.py)). |
 
    All of these values are read from `spec-shared/.env` by the dashboard backend ([`backend/config.py`](backend/config.py#L34-L38)). They stay on your laptop except for the key, secret and bootstrap server that are sent to the Simulation, and the browser never receives them.
 
 4. Go to your [Confluent Cloud home page](https://confluent.cloud/), open the right-side navigation panel then select **Accounts and access**.
  
-<img src="images/right_side_user_account.png" width="40%" />
+<img src="images/right_side_user_account.png"/>
 
 5. Select **API keys** tab then click the **Add API key**.
 
 <img src="images/user_account.png"/>
 
-6. Enter **Name** as `hive_workshop`, skip **Description**, open the **Select key scope** dropdown and choose `Kafka cluster`, choose **Environments** as `hive_dev` and **Cluster** as `hive_cluster`
+6. Enter **Name** as `hive_kafka_cluster`, skip **Description**, open the **Select key scope** dropdown and choose `Kafka cluster`, choose **Environments** as `hive_dev` and **Cluster** as `hive_cluster`.
 
-<img src="images/api_key.png" />
+<img src="images/api_key_kafka_cluster.png" />
 
 7. Click **Create API key** and copy the key and secret into [spec-shared/.env](../spec-shared/.env) because Confluent only shows it once.
 
 ```ini
-CONFLUENT_API_KEY=your-api-key
-CONFLUENT_API_SECRET=your-api-secret
+KAFKA_CLUSTER_API_KEY=your-api-key
+KAFKA_CLUSTER_API_SECRET=your-api-secret
 ```
+
+5. Now repeat these steps to create a 2nd API key. Click the **Add API key**.
+6. Enter **Name** as `hive_schema_registry`, skip **Description**, open the **Select key scope** dropdown and choose `Schema Registry`, choose **Environments** as `hive_dev`.
+
+<img src="images/api_key_schema_registry.png" />
+
+7. Click **Create API key** and copy the key and secret into [spec-shared/.env](../spec-shared/.env) because Confluent only shows it once.
+
+```ini
+SCHEMA_REGISTRY_API_KEY=your-api-key
+SCHEMA_REGISTRY_API_SECRET=your-api-secret
+```
+
+<img src="images/api_key_completed.png" />
 
 8. Return to your [Confluent Cloud home page](https://confluent.cloud/) and select your cluster.  There are various ways to get there, but you'll end up here.  Identify your **Rest endpoint**, **Bootstrap server** and **ID** of your cluster.  Enter them into [spec-shared/.env](../spec-shared/.env).
 
@@ -212,26 +229,34 @@ CONFLUENT_BOOTSTRAP_SERVER=pkc-xxxxx.us-west-2.aws.confluent.cloud:9092
 CONFLUENT_REST_ENDPOINT=https://pkc-xxxxx.us-west-2.aws.confluent.cloud
 CONFLUENT_CLUSTER_ID=lkc-xxxxxx
 ```
-9. Save [spec-shared/.env](../spec-shared/.env).
+9. Schema Registry has its own endpoint. Select **Schema Registry** in the left navigation. Copy the **Endpoint** (it starts with `https://psrc-`):
+
+```ini
+SCHEMA_REGISTRY_URL=https://psrc-xxxxx.us-west-2.aws.confluent.cloud
+```
+
+<img src="images/schema_registry_endpoint.png" />
+
+10. Save [spec-shared/.env](../spec-shared/.env).
 
 ---
 
-## Step 4: Provision Your Kafka Topics
+## Step 4: Provision Your Kafka Topics and Register Their Schemas
 
 Your Simulation talks to the rest of the workshop by publishing events to [Kafka topics](https://developer.confluent.io/courses/apache-kafka/topics/). A topic is a named, append-only log: the Simulation writes each new event to the end of the log, and your dashboard (and later, Apache Flink) reads it from the beginning. The topics must already exist in **your** cluster before the Simulation can publish to them. The Simulation checks for them when your dashboard registers your Simulation in the next step, so you create them first.
 
-From the repository root, run:
+You do this in two commands, one after the other. From the repository root, run:
 
 ```bash
-cd level-1-environment-setup/scripts
+cd "level-1-getting started/scripts"
 ./provision_topics.sh
+./register_schemas.sh
 ```
 
-The script creates its own Python virtual environment, installs what it needs, and then creates one topic per event type. You should see a line like `✓ Created  gathering-started` for each topic. It is safe to run more than once: topics that already exist are reported as `~ Exists` and left unchanged.
+The first script creates your topics; the second registers their schemas. Both query your Hive Simulation server for the list of event types at `GET /v1/schemas`. 
 
-### What the script does
-
-For each topic, the script makes one call to the Confluent Cloud Kafka REST API ([`provision_topics.py`](scripts/provision_topics.py#L135-L141)):
+## Provision Topics
+For each topic, the `provision_topics.sh` makes one call to the Confluent Cloud Kafka REST API to create one topic per event type. You should see a line like `✓ Created  gathering-started` for each topic. It is safe to run more than once: topics that already exist are reported as `~ Exists` and left unchanged.  
 
 ```python
 url = f"{rest_endpoint}/kafka/v3/clusters/{cluster_id}/topics"
@@ -243,7 +268,7 @@ body = json.dumps({
 }).encode()
 ```
 
-- **`topic_name: topic_name`** Every event type listed under `topics` in [`spec-shared/schemas/event_payloads.json`](../spec-shared/schemas/event_payloads.json) becomes one topic, with the dot in the event name replaced by a hyphen: `gathering.started` becomes `gathering-started`. Why dots and dashes is explained in a following Note. 
+- **`topic_name: topic_name`** Each event type returned by the Simulations server's `GET /v1/schemas` endpoint becomes one topic, with the dot in the event name replaced by a hyphen: `gathering.started` becomes `gathering-started`. Why dots and dashes is explained in a following Note. 
 - **`partitions_count: 1`.** A partition is Kafka's unit of parallelism and ordering. Events are only ordered *within* a partition, so a single partition keeps every event in a topic in the exact order it happened. That matters when you replay a simulation's history. You have one Simulation and one dashboard, so you don't need more.
 - **`replication_factor: 3`.** Each event is stored on three brokers so that losing one doesn't lose data. Three copies is the standard for durability on Confluent Cloud.
 - **`configs`** set how long Kafka keeps events. The script uses two different policies, described below.
@@ -258,18 +283,44 @@ body = json.dumps({
 >
 > In Apache Flink you refer to an event by its topic name, with backticks around it because of the hyphen: ``FROM `gathering-started` ``. You never need the dotted name there.
 
+## Why use Schema Registry
 
-**How long events are kept**
-Kafka does not delete an event just because it has been read. Each topic has a *cleanup policy* that decides when old events go away:
+A Kafka topic stores bytes. Kafka does not know or check what is inside them, so without more help every reader has to guess the shape of each event, and one writer's change can silently break every reader. **Schema Registry** fixes this by holding a **schema** for each topic: an agreed, versioned description of the fields an event has, their types and which ones are optional. It is the topic's *data contract*. In this workshop it gives you:
 
-| Topics | `cleanup.policy` | `retention.ms` | Why |
-|---|---|---|---|
-| Every event topic except `simulation-state` (`gathering-started`, `manufacturing-completed`, …) | `delete` | `86400000` (24 hours) | These are a stream of things that happened. Events older than 24 hours are discarded, which is plenty for a workshop session and keeps storage costs low. |
-| `simulation-state` | `compact` | `-1` (never expires by time) | Each message is a full snapshot of the simulation. *Compaction* keeps only the most recent message for each key, so a consumer that replays the topic from the start always ends up at the current state in a single pass, however long the Simulation has been running. |
+- **Bad events are stopped at the source.** The Simulation checks every event against its topic's schema before it is written. An event with a missing field or a wrong type is rejected and never reaches the topic, so nothing downstream has to cope with it.
+- **Typed columns instead of text parsing.** Because Flink knows the schema, it exposes each event as columns (`simulation_id`, `occurred_at`, `payload.job_id`, and so on). Your Level 2 to 4 SQL reads them directly, with no JSON parsing or casting, and a typo in a field name is an error you see at once rather than a column of NULLs.
+- **Safe change over time.** Each topic's schema is versioned, and Schema Registry enforces a compatibility rule (see below). A new version that would make old events unreadable is refused, so the Simulation can evolve without breaking your dashboard or jobs.
+- **One place to look.** Anyone can read a topic's schema in Schema Registry (and in the Confluent Cloud **Topics** page, which flags topics that have no data contract) to see exactly what the topic contains and who may rely on it.
 
-### Why this step comes before starting the backend
+On the wire, an event is a zero byte, the 4-byte schema ID, then the JSON of the event. That is why the Simulation, your dashboard and Flink must all use Schema Registry, and why a topic that already holds plain JSON cannot simply be given a schema afterwards.
 
-When your backend registers your Simulation in the next step, the Simulation first checks that every topic exists in your cluster and that it can write to them. If a topic is missing, the registration does not succeed. Creating the topics first avoids that.
+## Register Schemas
+
+Every topic also needs a **schema**: a description of the fields an event on that topic has. The Simulation writes every event with its topic's schema, and your dashboard and Apache Flink (from Level 2) use the same schema to read it back as typed columns instead of raw text. Schemas live in **Schema Registry**, and each topic gets one *subject* named after it with `-value` added, for example `gathering-started-value`.
+
+The Simulation server owns the schemas, so you do not write them. For each schema returned by the Simulation server's `GET /v1/schemas` endpoint, `register_schemas.sh` makes calls to the Confluent Cloud Schema Registry REST API to register one subject per topic. You should see a line like `✓ Registered  gathering-started-value` for each subject. It is safe to run more than once: a subject that is already registered with the same schema is reported as `~ Unchanged`. 
+
+```python
+# 1. Set the compatibility rule first, so it applies from version 1
+_http("PUT", f"{sr_url}/config/{quoted}", headers, {"compatibility": COMPATIBILITY})
+
+# 2. Register the schema as a new version of the subject
+_http(
+    "POST", f"{sr_url}/subjects/{quoted}/versions", headers,
+    {"schema": schema, "schemaType": entry.get("schema_type", "JSON")},
+)
+```
+
+([`register_schemas.py`](scripts/register_schemas.py) sends each call with `urllib`; `quoted` is the subject name made safe for a URL.)
+
+- **`subject: <topic>-value`** Each topic returned by the Simulation server's `GET /v1/schemas` endpoint gets one subject named after it, with `-value` added: `gathering-started` becomes `gathering-started-value`. The `-value` part means the schema describes the event itself (the message *value*). The message key is just the plain-text `simulation_id`, so it has no schema. There are 14 subjects, one per topic.
+- **`schema`** is the JSON Schema document the Simulation server publishes for that topic. It lists every field of the event, its type, which fields are required and which may be empty. It is the exact schema the Simulation uses to check each event before writing it, so what you register is always what the server sends.
+- **`schemaType: "JSON"`** tells Schema Registry the schema is a JSON Schema. Schema Registry also supports Avro and Protobuf, but the Simulation writes JSON events.
+- **`compatibility: BACKWARD_TRANSITIVE`** is the rule Schema Registry applies whenever someone adds a new version of the subject. It is set *before* the first version, so the rule covers every version. Your dashboard and Flink replay topics from the very beginning, and `simulation-state` is kept forever, so every old event must stay readable with the newest schema. This rule makes Schema Registry refuse any new version that would break that.
+
+When a subject already has a version, the script adds two checks before it registers anything. It reads the latest version (`GET /subjects/<subject>/versions/latest`) and, if it is identical, stops with `~ Unchanged`. If it differs, it asks Schema Registry whether the new schema is compatible (`POST /compatibility/subjects/<subject>/versions/latest`) and only registers it when the answer is yes. Otherwise it prints `✗ Rejected` and leaves the subject alone, so ask your instructor before changing it.
+
+> To start over, `./delete_topics_and_schemas.sh` deletes your topics **and** their Schema Registry subjects together (it lists everything and asks first; `--dry-run` only lists). Run `./provision_topics.sh` and then `./register_schemas.sh` again afterwards.
 
 ---
 
@@ -282,15 +333,15 @@ cd level-1-environment-setup/backend
 ./start_backend.sh
 ```
 
-The backend will start at `http://localhost:8001`.  Do not close this terminal window
+The backend will start at `http://localhost:8001`.  Do not close this terminal window.  It must remain open and running.
 
 ### What happens when the backend starts
 
 The first time the backend starts, it automatically connects your laptop, the Hive Simulation server and your Confluent Cloud cluster ([`backend/app.py`](backend/app.py#L121-L216)). You don't need to do anything for this to happen:
 
 1. **It reads your configuration.** The backend loads [spec-shared/.env](../spec-shared/.env) and checks it. If a value is missing, still a placeholder such as `CHANGE_ME`, or badly formatted, it stops there and reports the problem (see [If the connection fails](#if-the-connection-fails)).
-2. **It registers your Hive Dashboard with the Hive Simulation server.** The backend identifies you with your workshop access token and sends the server your Confluent bootstrap server, API key and API secret. The server creates your own personal robotic manufacturing Simulation and returns a **Simulation ID**, which the dashboard shows at the bottom-left in the sidebar.
-3. **The Hive Simulation server checks your Confluent Cloud cluster.** Using the credentials from [spec-shared/.env](../spec-shared/.env), it confirms that every event topic from [Step 4](#step-4-provision-your-kafka-topics) exists and that it is allowed to write to them, then sends a small test event to each. Once those checks pass, your Simulation is ready, and it waits in a paused state.
+2. **It registers your Hive Dashboard with the Hive Simulation server.** The backend identifies you with your workshop access token and sends the server your Confluent bootstrap server, API key and API secret, and your Schema Registry address, key and secret. The server creates your own personal robotic manufacturing Simulation and returns a **Simulation ID**, which the dashboard shows at the bottom-left in the sidebar.
+3. **The Hive Simulation server checks your Confluent Cloud cluster.** Using the credentials from [spec-shared/.env](../spec-shared/.env), it confirms that every event topic from [Step 4](#step-4-provision-your-kafka-topics-and-register-their-schemas) exists, that every schema is registered, and that it is allowed to write to your cluster by writing one empty, paused status record. Once those checks pass, your Simulation is ready, and it waits in a paused state.
 4. **The backend watches your cluster for the event topics.** It checks every few seconds that all of them exist, and streams the events to the dashboard in your browser as they arrive.
 
 ### Backend connection errors
@@ -308,6 +359,9 @@ cd level-1-environment-setup/frontend
 npm install
 npm run dev
 ```
+
+Do not close this terminal window either.  It must remain open and running.
+
 Open your browser at **`http://localhost:5174`** (or the port displayed in your terminal).  If you see errors or warnings, follow the instructions to resolve them.  Also check your backend server terminal window for errors.
 
 ---
@@ -316,7 +370,7 @@ Open your browser at **`http://localhost:5174`** (or the port displayed in your 
 
 When the dashboard loads, you will see the **Hive Robotics** interface.  The connection status indicator and **level selector dropdown** will be visible in the top-right.  As you advance through the workshop, you will use a Level selctor to activate each level. Automated validation tests will verify that your stream processing jobs and data pipelines are properly configured and running.  Once those tests pass, you will gain access to the level.
 
-If you see a **Level 1 is locked** warning like the one below instead, one or more of your topics are missing from your Confluent Cloud cluster. Re-run [Step 4](#step-4-provision-your-kafka-topics) and the warning clears once every topic exists. If **Run** still doesn't work afterwards, ask your instructor to reset your simulation.
+If you see a **Level 1 is locked** warning like the one below instead, one or more of your topics are missing from your Confluent Cloud cluster. Re-run [Step 4](#step-4-provision-your-kafka-topics-and-register-their-schemas) and the warning clears once every topic exists. If **Run** still doesn't work afterwards, ask your instructor to reset your simulation.
 
 <img src="images/level_1_error.png"/>
 

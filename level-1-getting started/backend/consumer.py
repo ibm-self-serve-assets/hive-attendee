@@ -3,7 +3,7 @@ import json
 import logging
 import time
 import uuid
-from typing import Optional, Callable, Awaitable
+from typing import Any, Optional, Callable, Awaitable, Tuple
 
 from backend.models import EventEnvelope
 from backend.log_setup import MAJOR
@@ -19,6 +19,41 @@ except ImportError:
     ConfluentConsumer = None
     KafkaError = None
     KAFKA_AVAILABLE = False
+
+try:
+    from confluent_kafka.schema_registry import SchemaRegistryClient
+    from confluent_kafka.schema_registry.json_schema import JSONDeserializer
+    from confluent_kafka.serialization import MessageField, SerializationContext
+    SCHEMA_REGISTRY_AVAILABLE = True
+except ImportError:
+    SchemaRegistryClient = None
+    JSONDeserializer = None
+    MessageField = None
+    SerializationContext = None
+    SCHEMA_REGISTRY_AVAILABLE = False
+
+
+def make_event_deserializer(
+    schema_registry_url: Optional[str] = None,
+    schema_registry_api_key: Optional[str] = None,
+    schema_registry_api_secret: Optional[str] = None,
+    schema_registry_client: Any = None,
+):
+    """
+    Deserializer for Simulation event records: a 5-byte Schema Registry prefix (0x00 + schema id)
+    followed by JSON. The writer schema is fetched from Schema Registry by id and the record is
+    validated against it. Returns None when Schema Registry is not configured.
+    """
+    if not SCHEMA_REGISTRY_AVAILABLE:
+        return None
+    if schema_registry_client is None:
+        if not (schema_registry_url and schema_registry_api_key and schema_registry_api_secret):
+            return None
+        schema_registry_client = SchemaRegistryClient({
+            "url": schema_registry_url,
+            "basic.auth.user.info": f"{schema_registry_api_key}:{schema_registry_api_secret}",
+        })
+    return JSONDeserializer(schema_str=None, schema_registry_client=schema_registry_client)
 
 
 def _make_group_id(prefix: str, store: DashboardStore) -> str:
@@ -41,6 +76,10 @@ class EventConsumerManager:
         api_secret: Optional[str] = None,
         topics: Optional[list] = None,
         on_event_callback: Optional[Callable] = None,
+        schema_registry_url: Optional[str] = None,
+        schema_registry_api_key: Optional[str] = None,
+        schema_registry_api_secret: Optional[str] = None,
+        deserializer: Any = None,
     ):
         self.store = store
         self.bootstrap_servers = bootstrap_servers
@@ -48,6 +87,9 @@ class EventConsumerManager:
         self.api_secret = api_secret
         self.topics = topics or []
         self.on_event_callback = on_event_callback
+        self.deserializer = deserializer or make_event_deserializer(
+            schema_registry_url, schema_registry_api_key, schema_registry_api_secret,
+        )
 
         self._running = False
         self._consumer_task: Optional[asyncio.Task] = None
@@ -72,9 +114,20 @@ class EventConsumerManager:
             self._kafka_consumer = None
         logger.info("Event consumer stopped.", extra=MAJOR)
 
+    def decode(self, msg) -> EventEnvelope:
+        """Turn one Kafka record into an EventEnvelope. Raises if it does not match its schema."""
+        data = self.deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
+        env = EventEnvelope(**data)
+        if not env.event_type and msg.topic():
+            env.event_type = msg.topic().replace("-", ".")
+        return env
+
     async def _run(self):
         if not (KAFKA_AVAILABLE and self.bootstrap_servers and self.api_key and self.api_secret and self.topics):
             logger.info("Kafka consumer not started: missing credentials or topics.")
+            return
+        if self.deserializer is None:
+            logger.warning("Kafka consumer not started: Schema Registry is not configured.")
             return
 
         group_id = _make_group_id("events", self.store)
@@ -117,16 +170,9 @@ class EventConsumerManager:
                     topic_counts[msg.topic()] = topic_counts.get(msg.topic(), 0) + 1
 
                     try:
-                        raw_val = msg.value().decode("utf-8")
-                        data = json.loads(raw_val)
-                        env = EventEnvelope(**data)
-                        if not env.event_type and msg.topic():
-                            env.event_type = msg.topic().replace("-", ".")
+                        env = self.decode(msg)
                     except Exception as parse_err:
                         logger.debug(f"Skipping malformed or unparseable record on {msg.topic()}: {parse_err}")
-                        continue
-
-                    if env.event_type == "connection.test":
                         continue
 
                     changed = self.store.ingest(env)
@@ -260,13 +306,13 @@ class CalculatedValuesConsumer:
 
 class InventoryBalancesConsumer:
     """
-    Consumes records from the `resource_inventory` topic (written by the
-    attendee's Level 3 Flink SQL) and updates `store.inventory` with the latest
-    quantity per (item_type, item_id).
+    Consumes records from the `resource_inventory` and `parts_inventory` topics
+    (written by the attendee's Level 3 Flink SQL) and updates `store.inventory`
+    with the latest quantity per (item_type, item_id).
 
-    The topic uses json-registry upsert format; each record is the current balance
-    for one item.  Flink writes the table's primary key (simulation_id, run_id,
-    item_type, item_id) to the Kafka message *key* and only `quantity` to the value,
+    The topics use json-registry upsert format; each record is the current balance
+    for one item. Flink writes the table's primary key (simulation_id, run_id,
+    resource_id/part_id) to the Kafka message *key* and only `quantity` to the value,
     so both must be read.
     """
 
@@ -276,14 +322,14 @@ class InventoryBalancesConsumer:
         bootstrap_servers: Optional[str] = None,
         api_key: Optional[str] = None,
         api_secret: Optional[str] = None,
-        topic: str = "resource_inventory",
+        topics: Tuple[str, ...] = ("resource_inventory", "parts_inventory"),
         on_change: Optional[Callable[[], Awaitable[None]]] = None,
     ):
         self.store = store
         self.bootstrap_servers = bootstrap_servers
         self.api_key = api_key
         self.api_secret = api_secret
-        self.topic = topic
+        self.topics = list(topics)
         self.on_change = on_change
 
         self._running = False
@@ -316,7 +362,7 @@ class InventoryBalancesConsumer:
             return
 
         group_id = _make_group_id("inv", self.store)
-        logger.info(f"InventoryBalances consumer group: {group_id}, topic: {self.topic}")
+        logger.info(f"InventoryBalances consumer group: {group_id}, topics: {self.topics}")
 
         conf = {
             "bootstrap.servers": self.bootstrap_servers,
@@ -333,7 +379,7 @@ class InventoryBalancesConsumer:
             "isolation.level": "read_uncommitted",
         }
         self._kafka_consumer = ConfluentConsumer(conf, logger=kafka_logger)
-        self._kafka_consumer.subscribe([self.topic])
+        self._kafka_consumer.subscribe(self.topics)
 
         while self._running:
             try:
@@ -359,7 +405,17 @@ class InventoryBalancesConsumer:
                     value = _decode(raw_val)
                     run_id    = key.get("run_id")
                     item_type = key.get("item_type")
-                    item_id   = key.get("item_id")
+                    if not item_type:
+                        topic_name = msg.topic() or ""
+                        if "part" in topic_name:
+                            item_type = "part"
+                        else:
+                            item_type = "resource"
+
+                    item_id = key.get("item_id")
+                    if not item_id:
+                        item_id = key.get("part_id") if item_type == "part" else key.get("resource_id")
+
                     quantity  = value.get("quantity")
                     if run_id and item_type and item_id and quantity is not None:
                         changed = self.store.ingest_inventory_balance(
@@ -368,9 +424,9 @@ class InventoryBalancesConsumer:
                         if changed and self.on_change:
                             await self.on_change()
                     else:
-                        logger.debug(f"resource_inventory record missing fields: {key} {value}")
+                        logger.debug(f"inventory record missing fields: {key} {value}")
                 except Exception as parse_err:
-                    logger.warning(f"Skipping malformed resource_inventory record: {parse_err}")
+                    logger.warning(f"Skipping malformed inventory record: {parse_err}")
                     continue
 
             except asyncio.CancelledError:

@@ -2,7 +2,8 @@
 """
 provision_topics.py
 ───────────────────
-Creates your Kafka topics before you register your simulation.  Uses the topics located in [spec-shared/schemas/event_payloads.json](../../spec-shared/schemas/event_payloads.json).
+Creates your Kafka topics before you register your simulation.  The list of topics comes from your
+Simulation server (GET /v1/schemas), so this script keeps no copy of it.
 
 The Simulation server publishes events to these topics as your Simulation runs.
 Topics must exist before you call /v1/simulations — the server verifies them
@@ -10,8 +11,9 @@ at registration time and will reject your request if any are missing.
 
 State topics (compact policy, infinite retention):
 simulation-state             — Simulation lifecycle snapshot (lifecycle status, errors)
+simulation-initialized       — Simulation configuration, written once per run
 
-WHY COMPACT FOR FACTORY-STATE?
+WHY COMPACT FOR SIMULATION-STATE?
   Log compaction keeps only the most recent message per key. This means your
   local consumer can always replay from offset 0 and land on current state
   in a single pass — no matter how long the Simulation has been running.
@@ -28,10 +30,13 @@ USAGE:
   #    CONFLUENT_CLUSTER_ID=lkc-xxxxxx
   #      → Confluent Cloud → Cluster → Cluster Settings → General → Cluster ID
   #
-  #    CONFLUENT_API_KEY=...   CONFLUENT_API_SECRET=...
+  #    KAFKA_CLUSTER_API_KEY=...   KAFKA_CLUSTER_API_SECRET=...
   #      → Confluent Cloud → Cluster → API Keys → Add key → My account
+  #
+  #    SIMULATION_SERVER_URL, WORKSHOP_ACCESS_TOKEN, ATTENDEE_ID   (from your instructor)
+  #      → used to ask your Simulation server which topics to create
 
-  # 2. Preview what will be created (no API calls):
+  # 2. Preview what will be created (only contacts the Simulation server):
   python3 provision_topics.py --dry-run
 
   # 3. Create your topics:
@@ -52,6 +57,8 @@ from typing import List, Tuple
 import certifi
 from dotenv import load_dotenv
 
+from sim_server import clean_env, fetch_topics
+
 # Use certifi's CA bundle so urllib works on macOS without the
 # "Install Certificates.command" step or any system keychain config.
 _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
@@ -63,7 +70,6 @@ _SPEC_DIR = Path(__file__).resolve().parent
 _SHARED_ENV = _SPEC_DIR.parent.parent / "spec-shared" / ".env"
 ENV_PATH = _SHARED_ENV if _SHARED_ENV.exists() else _SPEC_DIR / ".env"
 
-_SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "spec-shared" / "schemas" / "event_payloads_base.json"
 
 # ── Topic configuration ───────────────────────────────────────────────────────
 # Activity events: keep for 24 hours then discard.
@@ -81,29 +87,16 @@ STATE_CONFIG = {
     "retention.ms": "-1",   # -1 = no time-based deletion; compaction handles cleanup
 }
 
-STATE_TOPIC_KEYS = {"simulation.state"}
-
-def _load_topics() -> List[Tuple[str, dict]]:
+def _load_topics(server_url: str, token: str, attendee_id: str) -> List[Tuple[str, dict]]:
     """
-    Derive topic names from spec-shared/schemas/event_payloads.json.
-    Keys in ``topics`` use dot-notation (e.g. ``gathering.started``);
-    topic names use hyphens (``gathering-started``).
-    ``simulation.state`` gets the compact/infinite-retention policy;
-    all others get the delete/24 h policy.
+    The event topics, as published by the Simulation server (GET /v1/schemas).
+    ``simulation-state`` and ``simulation-initialized`` get the compact/infinite-retention
+    policy; all others get the delete/24 h policy.
     """
-    with _SCHEMA_PATH.open() as fh:
-        schema = json.load(fh)
     return [
-        (
-            key.replace(".", "-"),
-            STATE_CONFIG if key in STATE_TOPIC_KEYS else ACTIVITY_CONFIG,
-        )
-        for key in schema["topics"]
+        (name, STATE_CONFIG if kind == "state" else ACTIVITY_CONFIG)
+        for name, kind in fetch_topics(server_url, token, attendee_id)
     ]
-
-
-# Each tuple is (topic name, config), derived from the shared schema.
-TOPICS = _load_topics()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -191,25 +184,29 @@ def main():
     # Attendees only need to fill in .env — no `export` commands required.
     load_dotenv(ENV_PATH, override=False)
 
-    def get(key: str) -> str:
-        """Return the value, treating CHANGE_ME as empty."""
-        val = os.environ.get(key, "").strip().strip("'\"")
-        return "" if val == "CHANGE_ME" else val
+    get = clean_env
 
+    server_url    = get("SIMULATION_SERVER_URL").rstrip("/")
+    token         = get("WORKSHOP_ACCESS_TOKEN")
+    attendee_id   = get("ATTENDEE_ID")
     rest_endpoint = get("CONFLUENT_REST_ENDPOINT").rstrip("/")
     cluster_id    = get("CONFLUENT_CLUSTER_ID")
-    api_key       = get("CONFLUENT_API_KEY")
-    api_secret    = get("CONFLUENT_API_SECRET")
+    api_key       = get("KAFKA_CLUSTER_API_KEY")
+    api_secret    = get("KAFKA_CLUSTER_API_SECRET")
 
     # Validate all required values before doing any work.
-    # In dry-run mode credentials are not needed.
-    required = []
+    # In dry-run mode the Confluent credentials are not needed.
+    required = [
+        ("SIMULATION_SERVER_URL", server_url),
+        ("WORKSHOP_ACCESS_TOKEN", token),
+        ("ATTENDEE_ID",           attendee_id),
+    ]
     if not args.dry_run:
         required += [
             ("CONFLUENT_REST_ENDPOINT", rest_endpoint),
             ("CONFLUENT_CLUSTER_ID",    cluster_id),
-            ("CONFLUENT_API_KEY",       api_key),
-            ("CONFLUENT_API_SECRET",    api_secret),
+            ("KAFKA_CLUSTER_API_KEY",       api_key),
+            ("KAFKA_CLUSTER_API_SECRET",    api_secret),
         ]
 
     missing = [name for name, val in required if not val]
@@ -218,12 +215,17 @@ def main():
         for name in missing:
             print(f"  {name}=...")
         print(f"\nEdit {ENV_PATH} and fill in the values, then retry.")
-        if not args.dry_run:
-            print("Use --dry-run to preview topic names without credentials.")
+        sys.exit(1)
+
+    try:
+        topics = _load_topics(server_url, token, attendee_id)
+    except RuntimeError as e:
+        print(f"ERROR: {e}")
         sys.exit(1)
 
     # Print a summary header before doing any work.
-    print(f"Topics   : {len(TOPICS)}")
+    print(f"Server   : {server_url}")
+    print(f"Topics   : {len(topics)}")
     if args.dry_run:
         print("Mode     : dry-run — no API calls will be made")
     else:
@@ -234,7 +236,7 @@ def main():
     auth = _auth_header(api_key, api_secret) if not args.dry_run else ""
     failures = 0
 
-    for topic, cfg in TOPICS:
+    for topic, cfg in topics:
         ok = create_topic(rest_endpoint, cluster_id, auth, topic, cfg, args.dry_run)
         if not ok:
             failures += 1
@@ -249,7 +251,7 @@ def main():
     if args.dry_run:
         print("Dry-run complete. Remove --dry-run to create the topics for real.")
     else:
-        print("All topics provisioned. You can now register your simulation.")
+        print("All topics provisioned. You can now register your schema.")
 
 
 if __name__ == "__main__":

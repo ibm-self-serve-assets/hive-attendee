@@ -24,6 +24,11 @@ class BackendConfig(BaseModel):
     confluent_bootstrap_server: Optional[str] = None
     confluent_api_key: Optional[str] = None
     confluent_api_secret: Optional[str] = None
+    # Schema Registry of the same Confluent environment. Its API key is separate from the
+    # Kafka cluster key, because Schema Registry keys are created at environment level.
+    schema_registry_url: Optional[str] = None
+    schema_registry_api_key: Optional[str] = None
+    schema_registry_api_secret: Optional[str] = None
 
     # Names of settings that still hold a template value; used to tell "not filled in"
     # apart from "wrong" when reporting configuration problems to the attendee.
@@ -75,8 +80,11 @@ class BackendConfig(BaseModel):
             workshop_access_token=value("WORKSHOP_ACCESS_TOKEN"),
             attendee_id=value("ATTENDEE_ID"),
             confluent_bootstrap_server=value("CONFLUENT_BOOTSTRAP_SERVER"),
-            confluent_api_key=value("CONFLUENT_API_KEY"),
-            confluent_api_secret=value("CONFLUENT_API_SECRET"),
+            confluent_api_key=value("KAFKA_CLUSTER_API_KEY"),
+            confluent_api_secret=value("KAFKA_CLUSTER_API_SECRET"),
+            schema_registry_url=(value("SCHEMA_REGISTRY_URL") or "").rstrip("/") or None,
+            schema_registry_api_key=value("SCHEMA_REGISTRY_API_KEY"),
+            schema_registry_api_secret=value("SCHEMA_REGISTRY_API_SECRET"),
             placeholder_vars=placeholder_vars,
             local_backend_host=host,
             local_backend_port=port,

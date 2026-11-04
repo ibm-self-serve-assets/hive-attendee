@@ -77,3 +77,35 @@ async def test_failed_check_does_not_count_as_gate_lost():
     watcher._topic_exists = flaky
     await watcher._run()
     assert unlocked == []
+
+
+def test_event_topics_are_asked_of_the_server_until_it_answers(monkeypatch):
+    from backend.topic_watch import EventTopicsWatcher
+
+    calls = []
+
+    def source():
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("server not reachable yet")
+        return ["gathering-started"]
+
+    watcher = EventTopicsWatcher(
+        store=DashboardStore(), bootstrap_servers="b", api_key="k", api_secret="s",
+        on_change=_noop, topic_source=source,
+    )
+
+    class Meta:
+        topics = {"gathering-started": type("T", (), {"error": None})()}
+
+    class Admin:
+        def __init__(self, *a, **k): ...
+        def list_topics(self, timeout):
+            return Meta()
+
+    monkeypatch.setattr(topic_watch, "AdminClient", Admin)
+    with pytest.raises(RuntimeError):
+        watcher._missing_topics()
+    assert watcher._missing_topics() == []
+    assert watcher._missing_topics() == []
+    assert len(calls) == 2  # asked again after the failure, then kept

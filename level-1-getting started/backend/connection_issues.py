@@ -120,11 +120,11 @@ def validate_config(config: BackendConfig) -> List[Issue]:
                 message=f"CONFLUENT_BOOTSTRAP_SERVER is '{bootstrap}'. {problem}",
             ))
 
-    # CONFLUENT_API_KEY / CONFLUENT_API_SECRET
+    # KAFKA_CLUSTER_API_KEY / KAFKA_CLUSTER_API_SECRET
     missing_creds = [
         name for name, val in (
-            ("CONFLUENT_API_KEY", config.confluent_api_key),
-            ("CONFLUENT_API_SECRET", config.confluent_api_secret),
+            ("KAFKA_CLUSTER_API_KEY", config.confluent_api_key),
+            ("KAFKA_CLUSTER_API_SECRET", config.confluent_api_secret),
         ) if not val
     ]
     if missing_creds:
@@ -133,6 +133,35 @@ def validate_config(config: BackendConfig) -> List[Issue]:
             source=SOURCE_CONFIG,
             title="Confluent API key is incomplete",
             message=f"{' and '.join(missing_creds)} {'has' if len(missing_creds) == 1 else 'have'} not been filled in.",
+        ))
+
+    # SCHEMA_REGISTRY_URL / SCHEMA_REGISTRY_API_KEY / SCHEMA_REGISTRY_API_SECRET
+    missing_sr = [
+        name for name, val in (
+            ("SCHEMA_REGISTRY_URL", config.schema_registry_url),
+            ("SCHEMA_REGISTRY_API_KEY", config.schema_registry_api_key),
+            ("SCHEMA_REGISTRY_API_SECRET", config.schema_registry_api_secret),
+        ) if not val
+    ]
+    if missing_sr:
+        issues.append(Issue(
+            code="schema_registry_missing",
+            source=SOURCE_CONFIG,
+            title="Schema Registry settings are incomplete",
+            message=(
+                f"{', '.join(missing_sr)} {'has' if len(missing_sr) == 1 else 'have'} not been filled in. "
+                "The Simulation server writes events with a schema and needs your Schema Registry to check them."
+            ),
+        ))
+    elif not _is_valid_http_url(config.schema_registry_url):
+        issues.append(Issue(
+            code="schema_registry_url_invalid",
+            source=SOURCE_CONFIG,
+            title="SCHEMA_REGISTRY_URL is not a valid web address",
+            message=(
+                f"SCHEMA_REGISTRY_URL is '{config.schema_registry_url}'. "
+                "It must start with https:// and include a host name."
+            ),
         ))
 
     return issues
@@ -310,7 +339,7 @@ def from_server_diagnostic(diagnostic: Optional[Dict[str, Any]], fallback_detail
         source=SOURCE_CONFLUENT,
         title="The Simulation server could not verify your Confluent cluster",
         message=(
-            "The Simulation server tried to connect to your Confluent Cloud cluster and write test events, "
+            "The Simulation server tried to connect to your Confluent Cloud cluster and Schema Registry and write a status record, "
             "but the check failed."
         ),
         detail=_trim(fallback_detail),

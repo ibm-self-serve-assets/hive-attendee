@@ -20,7 +20,7 @@ from backend.consumer import (
     EventConsumerManager, CalculatedValuesConsumer, InventoryBalancesConsumer, QueensOrdersConsumer,
 )
 from backend.topic_watch import (
-    CalculatedValuesWatcher, InventoryBalancesWatcher, QueensOrdersWatcher, EventTopicsWatcher,
+    CalculatedValuesWatcher, InventoryBalancesWatcher, QueensOrdersWatcher, EventTopicsWatcher, fetch_event_topic_names,
 )
 
 logger = logging.getLogger("hive.backend")
@@ -81,6 +81,9 @@ async def lifespan(app: FastAPI):
         api_key=config.confluent_api_key,
         api_secret=config.confluent_api_secret,
         on_event_callback=notify_subscribers,
+        schema_registry_url=config.schema_registry_url,
+        schema_registry_api_key=config.schema_registry_api_key,
+        schema_registry_api_secret=config.schema_registry_api_secret,
     )
     consumer_mgr.start()
 
@@ -94,6 +97,9 @@ async def lifespan(app: FastAPI):
         api_secret=config.confluent_api_secret,
         on_change=_notify_state,
         on_unlocked=_restart_after_unlock,
+        topic_source=lambda: fetch_event_topic_names(
+            config.simulation_server_url, config.workshop_access_token, config.attendee_id
+        ),
     )
     event_topics_watcher.start()
 
@@ -170,6 +176,15 @@ async def lifespan(app: FastAPI):
         hive_queens_orders_consumer.stop()
     if consumer_mgr:
         consumer_mgr.stop()
+
+
+def _schema_registry_body() -> Dict[str, Optional[str]]:
+    """Schema Registry credentials in the shape the Simulation server's provision and rotate calls expect."""
+    return {
+        "url": config.schema_registry_url,
+        "api_key": config.schema_registry_api_key,
+        "api_secret": config.schema_registry_api_secret,
+    }
 
 
 PROVISION_WAIT_SECONDS = 45
@@ -305,6 +320,7 @@ async def _auto_connect():
                                     "api_key": config.confluent_api_key,
                                     "api_secret": config.confluent_api_secret,
                                 },
+                                "schema_registry": _schema_registry_body(),
                             },
                             headers={
                                 **headers,
@@ -367,6 +383,7 @@ async def _auto_connect():
                         "api_key": config.confluent_api_key,
                         "api_secret": config.confluent_api_secret,
                     },
+                    "schema_registry": _schema_registry_body(),
                 }
                 if config.attendee_id:
                     prov_body["attendee_id"] = config.attendee_id
@@ -408,6 +425,9 @@ async def _auto_connect():
                     api_secret=config.confluent_api_secret,
                     topics=topic_list,
                     on_event_callback=notify_subscribers,
+                    schema_registry_url=config.schema_registry_url,
+                    schema_registry_api_key=config.schema_registry_api_key,
+                    schema_registry_api_secret=config.schema_registry_api_secret,
                 )
                 consumer_mgr.start()
                 logger.info(f"AUTO-CONNECT: Consumer started on {len(topic_list)} topics", extra=MAJOR)
