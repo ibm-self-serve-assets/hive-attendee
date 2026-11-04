@@ -2,6 +2,7 @@ import React from 'react';
 import { EventPanel } from '../../components/EventPanel';
 import { FlowDots } from '../../components/FlowDots';
 import { HexagonTierBadge } from '../../components/HexagonTierBadge';
+import { GatheringStation } from '../../components/GatheringStation';
 import { AssemblyQueue } from '../../components/AssemblyQueue';
 import { useLevel4 } from './Level4Context';
 import type { LevelScreenProps } from '../types';
@@ -107,7 +108,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
     assembly_blocked,
     manufacturing_inputs,
     assembly_inputs,
-    job_durations,
     inventory,
     events,
     robot_queue,
@@ -146,8 +146,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                 {GATHERING_ORDER.map((gid) => {
                   const res = RESOURCES.find(r => r.id === gid)!;
                   const { id, label, icon } = res;
-                  const blocked = false;
-                  const dur = job_durations[id];
                   const slots = stationSlots[id] ?? [{ id: 1, tier: 1 }];
 
                   return (
@@ -158,66 +156,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         <span className="text-sm font-semibold text-[#031040]">{label}</span>
                       </div>
 
-                      {/* Stations row (up to 3) + Add button */}
-                      <div className="flex items-start justify-start gap-3 flex-wrap">
-                        {slots.map((st) => {
-                          const isMax = st.tier >= 3;
-                          const durationText = dur == null ? `? mins` : `${dur} mins`;
-
-                          return (
-                            <div key={st.id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
-                              <HexagonTierBadge
-                                tier={st.tier}
-                                blocked={blocked}
-                                active={running}
-                                tooltip="Waiting for resources"
-                                size={50}
-                              />
-                              <span
-                                className="text-xs font-semibold leading-tight text-center whitespace-nowrap"
-                                style={{ color: blocked ? '#D36B00' : '#57606A' }}
-                              >
-                                {blocked ? 'Parts unavailable' : durationText}
-                              </span>
-                              {isMax || !SHOW_ORDER_BUTTONS ? (
-                                <div></div>
-                              ) : (
-                                <button
-                                  onClick={() => upgradeStation(id)}
-                                  title="Assign a Gatherer to increase gathering speed"
-                                  disabled={isOrderPending(id, 'upgrade')}
-                                  className={actionBtnClass(!isOrderPending(id, 'upgrade'))}
-                                >
-                                  <svg width="14" height="20" viewBox="0 0 12 17" fill="none" aria-hidden="true"><path d="M6 14V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  Gatherer
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-
-                        {SHOW_ORDER_BUTTONS && slots.length < maxStations && (
-                          <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
-                            <AddStationHexagon
-                              onClick={() => addStation(id)}
-                              disabled={isOrderPending(id, 'add')}
-                              size={50}
-                            />
-                            <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
-                              Add station
-                            </span>
-                            <button
-                              onClick={() => addStation(id)}
-                              title="Assign a Builder to add a new gathering station"
-                              disabled={isOrderPending(id, 'add')}
-                              className={actionBtnClass(!isOrderPending(id, 'add'))}
-                            >
-                              <svg width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                              Builder
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <GatheringStation tier={slots[0].tier} resourceName={label} />
                     </div>
                   );
                 })}
@@ -247,7 +186,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
               <div className="flex flex-col gap-3">
                 {STATIONS.map(({ id, label, icon, output_type }) => {
                   const blocked    = id in (manufacturing_blocked ?? {});
-                  const dur        = job_durations[id] ?? job_durations[output_type];
                   const inputs     = manufacturing_inputs[id] ?? {};
                   const missingSet = blocked ? new Set(Object.keys(manufacturing_blocked[id] ?? {})) : undefined;
                   const slots      = stationSlots[id] ?? [{ id: 1, tier: 1 }];
@@ -265,8 +203,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       <div className="flex items-start justify-start gap-3 flex-wrap">
                         {slots.map((st) => {
                           const isMax = st.tier >= 3;
-                          const durationText = dur == null ? `? mins` : `${dur} mins`;
-
                           return (
                             <div key={st.id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
                               <HexagonTierBadge
@@ -276,12 +212,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                 tooltip="Waiting for resources"
                                 size={50}
                               />
-                              <span
-                                className="text-xs font-semibold leading-tight text-center whitespace-nowrap"
-                                style={{ color: blocked ? '#D36B00' : '#57606A' }}
-                              >
-                                {blocked ? 'Parts unavailable' : durationText}
-                              </span>
                               {isMax || !SHOW_ORDER_BUTTONS ? (
                                 <div></div>
                               ) : (
@@ -348,7 +278,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                   const scheduled   = queue[0]?.robot_type === id || !!assemblyActive[station_id];
                   const blocked     = scheduled && station_id in (assembly_blocked ?? {});
                   const disabled    = !scheduled;
-                  const dur         = job_durations[station_id] ?? job_durations[id];
                   const inputs      = assembly_inputs[station_id] ?? {};
                   const missingSet  = blocked ? new Set(Object.keys(assembly_blocked[station_id] ?? {})) : undefined;
                   const slots       = stationSlots[station_id] ?? [{ id: 1, tier: 1 }];
@@ -366,7 +295,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       <div className="flex items-start justify-start gap-3 flex-wrap">
                         {slots.map((st) => {
                           const isMax = st.tier >= 3;
-                          const durationText = dur == null ? `? mins` : `${dur} mins`;
                           return (
                             <div key={st.id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
                               <HexagonTierBadge
@@ -377,12 +305,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                 tooltip="Waiting for parts"
                                 size={50}
                               />
-                              <span
-                                className="text-xs font-semibold leading-tight text-center whitespace-nowrap"
-                                style={{ color: blocked ? '#D36B00' : '#57606A' }}
-                              >
-                                {blocked ? 'Parts unavailable' : disabled ? 'Idle' : durationText}
-                              </span>
                               {isMax || !SHOW_ORDER_BUTTONS ? (
                                 <div></div>
                               ) : (

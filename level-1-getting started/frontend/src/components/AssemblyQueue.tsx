@@ -24,16 +24,17 @@ const describeOrder = (order: QueenOrder) => {
     : `${robot} to upgrade the ${station} workstation`;
 };
 
-/** Up arrow for an upgrade, plus sign for a new workstation (builder). */
-const ActionGlyph: React.FC<{ action: QueenOrder['action'] }> = ({ action }) => (
-  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" className="flex-none">
-    {action === 'add' ? (
-      <path d="M6 1.5v9M1.5 6h9" stroke="#031040" strokeWidth="2" strokeLinecap="round" />
-    ) : (
-      <path d="M6 11V2M2.5 5.5L6 2l3.5 3.5" stroke="#031040" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    )}
-  </svg>
-);
+/** Up arrow for an upgrade, plus sign for a new workstation (builder). 22px tall, like the station icon. */
+const ActionGlyph: React.FC<{ action: QueenOrder['action'] }> = ({ action }) =>
+  action === 'add' ? (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" className="flex-none">
+      <path d="M11 2v18M2 11h18" stroke="#031040" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg width="14" height="22" viewBox="0 0 14 22" fill="none" aria-hidden="true" className="flex-none">
+      <path d="M7 20V2M1.5 7.5L7 2l5.5 5.5" stroke="#031040" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 
 export interface AssemblyQueueProps {
   /** The Queen's open orders, first in first out. */
@@ -102,7 +103,6 @@ export const AssemblyQueue: React.FC<AssemblyQueueProps> = ({ queue }) => {
       <div ref={containerRef} className="flex items-end gap-2 pt-1.5 pb-1 overflow-hidden min-w-0">
         {visibleItems.map((order, idx) => {
           const isNext = idx === 0;
-          const letter = order.robot_type.charAt(0).toUpperCase();
           const icon = stationIcon(order.station);
           return (
             <div key={order.order_id} className="flex flex-col items-center gap-1 flex-none">
@@ -114,7 +114,6 @@ export const AssemblyQueue: React.FC<AssemblyQueueProps> = ({ queue }) => {
                 }`}
                 title={describeOrder(order)}
               >
-                <span>{letter}</span>
                 <ActionGlyph action={order.action} />
                 {icon ? (
                   <img src={icon} width={22} height={22} alt={order.station} className="flex-none" />
