@@ -14,12 +14,11 @@ Head to **[Level 1 — Getting Started](level-1-getting-started/README.md)** to 
 | 1 | Environment Setup | Connect to Confluent Cloud, provision topics, launch the Hive Dashboard |
 | 2 | Intro to Apache Flink | Interval joins → job duration stream (`workstation_efficiency`) |
 | 3 | Hive Inventory | Stateful aggregations → live inventory balances (`resource_inventory`, `parts_inventory`) |
-| 4 | Queen's Orders | Orders for new worker bees → live order queue (`queens_orders`) |
-| 5 | Part Prioritization *(planned)* | Join the Queen's queue with recipe inputs → parts manufacturing queue |
-| 6 | Gamified UI *(planned)* | Play the Hive from a game-style dashboard |
-| 7 | Tableflow *(planned)* | Materialize streams as Apache Iceberg tables |
-| 8 | Headless Agent *(planned)* | Install IBM Bob in a headless agentic harness |
-| 9 | Bob Runs the Hive *(planned)* | IBM Bob manages the Simulation end-to-end |
+| 4 | Queen's Orders | Orders for new worker bees → live order queue (`queens_orders`), then join it with recipe inputs → parts manufacturing queue (`parts_priority_queue`) |
+| 5 | Gamified UI *(planned)* | Play the Hive from a game-style dashboard |
+| 6 | Tableflow *(planned)* | Materialize streams as Apache Iceberg tables |
+| 7 | Headless Agent *(planned)* | Install IBM Bob in a headless agentic harness |
+| 8 | Bob Runs the Hive *(planned)* | IBM Bob manages the Simulation end-to-end |
 
 <img src="images/hive_dashboard.png"/>
 

@@ -144,11 +144,11 @@ In the queue above for the Queen's orders, we can see:
 
 ---
 
-## What's Next: Part Prioritization (Level 5)
+## Part Prioritization
 
 The queue answers *what* the Hive should build next.  It raises a new question: how do we prioritize **parts manufacturing** based on the next Worker in the queue?
 
-The **Robot Assembly** stations "know" the parts they need, but they are independent of **Parts Manufacturing**.  The non-event-driven solution would be a hard-coded REST call to place orders for parts based on the next robot in the queue.  Instead, you'll use Flink to join `queens_orders` with the recipe inputs from `assembly-started` and produce a new topic that drives a **Parts Manufacturing Queue** in Level 5. 
+The **Robot Assembly** stations "know" the parts they need, but they are independent of **Parts Manufacturing**.  The non-event-driven solution would be a hard-coded REST call to place orders for parts based on the next robot in the queue.  Instead, you'll use Flink to join `queens_orders` with the recipe inputs from `assembly-started` and produce a new topic that drives a **Parts Manufacturing Queue**.
 
 ## Useful CLI Commands
 
@@ -302,7 +302,7 @@ At the `>` prompt, paste the query from `flink/06_validate_priority.sql` and pre
 - Earlier runs listed too if you restarted the Simulation.  Each run has its own `run_id`.
 - If no rows appear after a couple of minutes, check that the Simulation timer is incrementing and that both jobs are `RUNNING`.  Remember that a robot type has no recipe until its first `assembly-started` event.
 
-**Congratulations! Your Parts Manufacturing Team now has a `parts_priority_queue`!**  Level 5 builds on this topic.
+**Congratulations! Your Parts Manufacturing Team now has a `parts_priority_queue`!**  The next level builds on this topic.
 
 ---
 
