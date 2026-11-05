@@ -5,9 +5,9 @@
 -- Starts one continuous Flink job that builds the `queens_orders` table,
 -- one row per order, from three event streams:
 --
---     queen-robot-ordered   -> OPEN
+--     queen-worker-ordered   -> OPEN
 --     assembly-started      -> IN_ASSEMBLY
---     queen-robot-assigned  -> ASSIGNED
+--     worker-assigned  -> ASSIGNED
 --
 -- Events are grouped by order_id; the furthest stage reached is the order's
 -- status. The dashboard queue shows orders with status = 'OPEN'.
@@ -48,7 +48,7 @@ FROM (
     payload.action AS action,
     CAST(event_sequence AS BIGINT) AS placed_seq,
     1 AS lifecycle_stage
-  FROM `queen-robot-ordered`
+  FROM `queen-worker-ordered`
   WHERE payload.order_id IS NOT NULL
 
   UNION ALL
@@ -78,7 +78,7 @@ FROM (
     payload.action AS action,
     CAST(NULL AS BIGINT) AS placed_seq,
     3 AS lifecycle_stage
-  FROM `queen-robot-assigned`
+  FROM `worker-assigned`
   WHERE payload.order_id IS NOT NULL
 
 )

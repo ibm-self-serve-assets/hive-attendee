@@ -24,21 +24,18 @@ logger = logging.getLogger("hive.store")
 
 
 # ── Resource label / icon mapping ────────────────────────────────────────────
+# These lists must stay in sync with schemas/simulation_rules_private.json in hive-simulation.
+# They are used only to pre-zero completed/active counters before simulation.initialized arrives.
+# Assembly stations are not pre-zeroed here — the set is derived dynamically from
+# simulation_config.station_initial_tiers when simulation.initialized is ingested.
 RESOURCE_STATIONS = ["copper", "energy", "metals", "resin", "silicon"]
 
-# Parts manufacturing stations
 MANUFACTURING_STATIONS = [
     "actuator",
     "battery",
     "chassis",
     "electronics",
 ]
-
-# Assembly stations and their robot output
-ASSEMBLY_STATIONS = {
-    "engineer": "engineer",
-    "gatherer": "gatherer",
-}
 
 # Recent raw events kept per dashboard section (newest first), keyed by event_type prefix.
 EVENT_LOG_CATEGORIES = ("gathering", "manufacturing", "assembly")
@@ -57,6 +54,12 @@ class DashboardStore:
         # station_initial_tiers.
         # None until the first simulation.initialized event is ingested.
         self.simulation_config: Optional[Dict[str, Any]] = None
+
+        # Live station layout, updated by *.upgraded / *.added events.
+        # station_tiers: station_id → current tier (seeded from station_initial_tiers).
+        # station_slots: station_id → list of {id, tier} dicts (one slot per station initially).
+        self.station_tiers: Dict[str, int] = {}
+        self.station_slots: Dict[str, List[Dict]] = {}
 
         # sim time — updated from every envelope
         self.latest_sim_time_minutes: int = 0
@@ -136,6 +139,12 @@ class DashboardStore:
         self.connection_status: str = "connecting"
         self.connection_issues: List[Dict[str, Any]] = []
 
+        # Warnings that the schemas in the attendee's Schema Registry do not match what the
+        # Simulation server publishes (backend.connection_issues.Issue as dicts). Re-evaluated
+        # continuously; the dashboard only warns, the attendee fixes Confluent themselves.
+        # Independent of the Simulation run, so reset() leaves it alone.
+        self.schema_warnings: List[Dict[str, Any]] = []
+
         # Dedup
         self._seen_ids: Dict[str, None] = {}
         self._seen_max = 5000
@@ -159,6 +168,8 @@ class DashboardStore:
         self.job_durations = {}
         self.events = {c: [] for c in EVENT_LOG_CATEGORIES}
         self.simulation_config = None
+        self.station_tiers = {}
+        self.station_slots = {}
         self._seen_ids.clear()
 
     def ingest(self, env: EventEnvelope) -> bool:
@@ -211,6 +222,8 @@ class DashboardStore:
             self.job_durations = {}
             self.events = {c: [] for c in EVENT_LOG_CATEGORIES}
             self.simulation_config = None
+            self.station_tiers = {}
+            self.station_slots = {}
         elif env.sim_time_minutes > self.latest_sim_time_minutes:
             self.latest_sim_time_minutes = env.sim_time_minutes
         self._last_event_mono = time.monotonic()
@@ -315,6 +328,35 @@ class DashboardStore:
             cfg = p.get("simulation_config")
             if isinstance(cfg, dict):
                 self.simulation_config = cfg
+                # Seed the live layout from initial tiers (once per run).
+                initial_tiers: Dict[str, int] = cfg.get("station_initial_tiers", {})
+                if initial_tiers and not self.station_tiers:
+                    self.station_tiers = dict(initial_tiers)
+                    self.station_slots = {
+                        sid: [{"id": 1, "tier": tier}]
+                        for sid, tier in initial_tiers.items()
+                    }
+            return True
+
+        if et in ("gathering.region.upgraded", "manufacturing.workstation.upgraded", "assembly.workstation.upgraded"):
+            sid = p.get("station_id")
+            new_tier = p.get("new_tier")
+            if sid and new_tier:
+                self.station_tiers[sid] = new_tier
+                # Update tier on the first slot (there is always at least one).
+                slots = self.station_slots.get(sid)
+                if slots:
+                    slots[0]["tier"] = new_tier
+            return True
+
+        if et in ("gathering.region.added", "manufacturing.workstation.added", "assembly.workstation.added"):
+            sid = p.get("station_id")
+            slot_index = p.get("slot_index")
+            tier = p.get("tier", 1)
+            if sid and slot_index:
+                slots = self.station_slots.setdefault(sid, [{"id": 1, "tier": self.station_tiers.get(sid, 1)}])
+                if slot_index > len(slots):
+                    slots.append({"id": slot_index, "tier": tier})
             return True
 
         # simulation.state etc. — still counted as activity
@@ -413,6 +455,9 @@ class DashboardStore:
             "resource_inventory_ready": self.resource_inventory_ready,
             "queens_orders_ready": self.queens_orders_ready,
             "simulation_config": self.simulation_config,
+            "station_tiers": dict(self.station_tiers),
+            "station_slots": {sid: list(slots) for sid, slots in self.station_slots.items()},
             "connection_status": self.connection_status,
             "connection_issues": [dict(i) for i in self.connection_issues],
+            "schema_warnings": [dict(i) for i in self.schema_warnings],
         }

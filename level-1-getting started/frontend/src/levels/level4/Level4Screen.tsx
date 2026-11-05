@@ -124,14 +124,14 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
   const isOrderPending = level4?.isOrderPending ?? ((_station: string, _action: 'add' | 'upgrade') => false);
 
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div className="flex-1 overflow-auto p-3">
       <div className="flex items-start gap-0 min-w-0">
 
         {/* ── Column 1: Resource gathering ──────────────────────────────── */}
-        <div className="flex-[4] flex flex-col gap-4 min-w-0">
+        <div className="flex-[4] flex flex-col gap-2 min-w-0">
           {/* Inventory */}
-          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-4">
-            <h2 className="text-[#2850B8] font-bold text-sm mb-3">Resource inventory</h2>
+          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-3">
+            <h2 className="text-[#2850B8] font-bold text-sm mb-1.5">Resource inventory</h2>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               {RESOURCES.map(({ id, label, icon }) => (
                 <InventoryItem key={id} icon={icon} label={label} qty={inventory.resource[id] ?? 0} />
@@ -156,7 +156,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         <span className="text-sm font-semibold text-[#031040]">{label}</span>
                       </div>
 
-                      <GatheringStation tier={slots[0].tier} resourceName={label} />
+                      <GatheringStation tier={slots[0].tier} resourceName={label} running={running} />
                     </div>
                   );
                 })}
@@ -169,10 +169,10 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
         <FlowDots running={running} />
 
         {/* ── Column 2: Parts manufacturing ─────────────────────────────── */}
-        <div className="flex-[3] flex flex-col gap-4 min-w-0">
+        <div className="flex-[3] flex flex-col gap-2 min-w-0">
           {/* Inventory */}
-          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-4">
-            <h2 className="text-[#2850B8] font-bold text-sm mb-3">Parts inventory</h2>
+          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-3">
+            <h2 className="text-[#2850B8] font-bold text-sm mb-1.5">Parts inventory</h2>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               {PARTS.map(({ id, label, icon }) => (
                 <InventoryItem key={id} icon={icon} label={label} qty={inventory.part[id] ?? 0} />

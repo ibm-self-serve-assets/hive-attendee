@@ -177,7 +177,7 @@ export const EventPanel: React.FC<EventPanelProps> = ({ title, events, defaultOp
   const [selected, setSelected] = useState<HiveEvent | null>(null);
 
   return (
-    <div className="mt-4 rounded-xl border border-[#E0E8F8] bg-white overflow-hidden">
+    <div className="mt-2 rounded-xl border border-[#E0E8F8] bg-white overflow-hidden">
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-4 py-3 text-left"

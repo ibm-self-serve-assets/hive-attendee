@@ -346,6 +346,47 @@ def from_server_diagnostic(diagnostic: Optional[Dict[str, Any]], fallback_detail
     )
 
 
+# ── 2b. Schemas in Confluent compared with the Simulation server ──────────────
+
+# Codes the Simulation server uses when the schemas in the attendee's Schema Registry are wrong.
+SCHEMA_ISSUE_CODES = {"schema_subjects_missing", "schema_subjects_differ", "schema_rejected_event"}
+# Reported when an event topic is absent from the attendee's cluster (fixed by provision_topics.sh).
+TOPIC_ISSUE_CODES = {"confluent_topics_missing"}
+
+
+def _shown(names: List[str]) -> str:
+    return ", ".join(names[:5]) + (f" and {len(names) - 5} more" if len(names) > 5 else "")
+
+
+def schema_warnings(missing: List[str], differ: List[str]) -> List[Issue]:
+    """
+    Warnings for a Schema Registry that does not match what the Simulation server publishes.
+    The dashboard never changes Confluent; the attendee fixes it with register_schemas.sh.
+    """
+    issues: List[Issue] = []
+    if missing:
+        issues.append(Issue(
+            code="schema_subjects_missing",
+            source=SOURCE_CONFLUENT,
+            title="Your Schema Registry is missing Hive schemas",
+            message=(
+                f"These subjects are not registered: {_shown(missing)}. "
+                "Run register_schemas.sh (Level 1 scripts folder) to register them."
+            ),
+        ))
+    if differ:
+        issues.append(Issue(
+            code="schema_subjects_differ",
+            source=SOURCE_CONFLUENT,
+            title="Your registered schemas do not match the Simulation server",
+            message=(
+                f"These subjects hold a different schema than the Simulation server publishes: {_shown(differ)}. "
+                "Run register_schemas.sh (Level 1 scripts folder) to register the current schemas."
+            ),
+        ))
+    return issues
+
+
 # ── 3. Confluent Cloud (checked from this laptop) ─────────────────────────────
 
 def classify_confluent_error(

@@ -56,10 +56,13 @@ const Level4Context = createContext<Level4ContextValue | null>(null);
 export const Level4Provider: React.FC<{ state: DashboardState; children: React.ReactNode }> = ({ state, children }) => {
   const cfg = state.simulation_config;
 
-  // Stations as configured at the start of the run. The Queen's orders do not change them yet:
-  // TODO: apply upgrade / add-station effects once QueenState.assign_robot has an effect on the
-  // stations (see Phase 3 in next_steps_simulation.md).
+  // Use live station_slots from the backend (populated by *.upgraded / *.added events).
+  // Falls back to initial tiers from simulation_config when the backend has not yet sent slot data.
   const stationSlots = useMemo<Record<string, StationSlot[]>>(() => {
+    if (state.station_slots && Object.keys(state.station_slots).length > 0) {
+      return state.station_slots;
+    }
+    // Fallback: one slot per station at initial tier.
     const tiers = initialTiers(cfg);
     return Object.fromEntries(
       Object.entries(tiers).map(([stationId, tier]) => [
@@ -67,7 +70,7 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
         [{ id: 1, tier }],
       ])
     );
-  }, [cfg]);
+  }, [state.station_slots, cfg]);
 
   const configReady = cfg !== null;
 
@@ -114,7 +117,7 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
     const key = orderKey(station, action);
     setSubmitted((prev) => ({ ...prev, [key]: Date.now() }));
     try {
-      const r = await fetch('/api/order-robot', {
+      const r = await fetch('/api/order-worker-beee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ robot_type: robotType, station }),

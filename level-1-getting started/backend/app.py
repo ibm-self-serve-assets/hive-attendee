@@ -20,7 +20,8 @@ from backend.consumer import (
     EventConsumerManager, CalculatedValuesConsumer, InventoryBalancesConsumer, QueensOrdersConsumer,
 )
 from backend.topic_watch import (
-    CalculatedValuesWatcher, InventoryBalancesWatcher, QueensOrdersWatcher, EventTopicsWatcher, fetch_event_topic_names,
+    CalculatedValuesWatcher, InventoryBalancesWatcher, QueensOrdersWatcher, EventTopicsWatcher, SchemaWatcher,
+    fetch_event_topic_names, fetch_published_schemas, fetch_registered_schema,
 )
 
 logger = logging.getLogger("hive.backend")
@@ -35,6 +36,7 @@ hive_inventory_balances_watcher: Optional[InventoryBalancesWatcher] = None
 hive_inventory_balances_consumer: Optional[InventoryBalancesConsumer] = None
 hive_queens_orders_watcher: Optional[QueensOrdersWatcher] = None
 hive_queens_orders_consumer: Optional[QueensOrdersConsumer] = None
+schema_watcher: Optional[SchemaWatcher] = None
 subscribers: List[asyncio.Queue] = []
 
 
@@ -65,7 +67,7 @@ async def notify_subscribers(snap: Dict[str, Any]):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global consumer_mgr, event_topics_watcher, \
+    global consumer_mgr, event_topics_watcher, schema_watcher, \
         hive_job_durations_watcher, hive_job_durations_consumer, \
         hive_inventory_balances_watcher, hive_inventory_balances_consumer, \
         hive_queens_orders_watcher, hive_queens_orders_consumer
@@ -102,6 +104,25 @@ async def lifespan(app: FastAPI):
         ),
     )
     event_topics_watcher.start()
+
+    # Compares what the Simulation server publishes with what is in the attendee's Schema
+    # Registry. Read-only: the attendee owns Confluent and fixes a warning with register_schemas.sh.
+    schema_watcher = SchemaWatcher(
+        store=store,
+        on_change=_notify_state,
+        published_source=lambda: fetch_published_schemas(
+            config.simulation_server_url, config.workshop_access_token, config.attendee_id
+        ),
+        registered_source=lambda subject: fetch_registered_schema(
+            config.schema_registry_url, config.schema_registry_api_key, config.schema_registry_api_secret, subject
+        ),
+    ) if (
+        config.workshop_access_token and config.schema_registry_url
+        and config.schema_registry_api_key and config.schema_registry_api_secret
+    ) else None
+    if schema_watcher:
+        schema_watcher.start()
+        reconnect_task = asyncio.create_task(_reconnect_when_schemas_fixed(schema_watcher))
 
     hive_job_durations_watcher = CalculatedValuesWatcher(
         store=store,
@@ -163,6 +184,9 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(auto_connect())
     yield
     event_topics_watcher.stop()
+    if schema_watcher:
+        schema_watcher.stop()
+        reconnect_task.cancel()
     hive_job_durations_watcher.stop()
     if hive_job_durations_consumer:
         hive_job_durations_consumer.stop()
@@ -256,6 +280,53 @@ async def _wait_for_provisioning(
         if lifecycle not in ("provisioning", None):
             return data, None
     return None, ci.provisioning_timeout(config, PROVISION_WAIT_SECONDS)
+
+
+RECONNECT_CHECK_SECONDS = 2.0
+RECONNECT_RETRY_SECONDS = 15.0
+
+
+def _confluent_content_fixed(watcher: SchemaWatcher) -> bool:
+    """
+    True when the connection failed only because Confluent lacked the Hive schemas or topics,
+    and the watchers now find them in place. Never true for other failures (bad keys, network).
+    """
+    if store.connection_status != "failed" or not store.connection_issues:
+        return False
+    for issue in store.connection_issues:
+        code = issue.get("code")
+        if code in ci.SCHEMA_ISSUE_CODES:
+            if not watcher.clean:
+                return False
+        elif code in ci.TOPIC_ISSUE_CODES:
+            if not store.event_topics_ready:
+                return False
+        else:
+            return False
+    return True
+
+
+async def _reconnect_when_schemas_fixed(watcher: SchemaWatcher) -> None:
+    """
+    If the connection failed because the Hive schemas or topics were missing from the attendee's
+    Confluent, connect again as soon as the watchers find them in place, so the error clears by
+    itself once the attendee has run register_schemas.sh / provision_topics.sh. It looks at the
+    current state every couple of seconds, so it does not matter whether the fix lands before or
+    after the connect attempt gave up. Does not change Confluent. A retry is not repeated for
+    RECONNECT_RETRY_SECONDS.
+    """
+    last_try = 0.0
+    while True:
+        try:
+            await asyncio.sleep(RECONNECT_CHECK_SECONDS)
+            if _confluent_content_fixed(watcher) and time.monotonic() - last_try >= RECONNECT_RETRY_SECONDS:
+                last_try = time.monotonic()
+                logger.info("Confluent now matches the Simulation server; connecting again", extra=MAJOR)
+                await auto_connect()
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.warning(f"Reconnect after schema fix failed: {e}")
 
 
 async def auto_connect():
@@ -614,13 +685,13 @@ def _raise_for_server_error(r: httpx.Response) -> None:
         raise HTTPException(status_code=r.status_code, detail=err_body)
 
 
-# The Queen's queue is not kept here: the server emits queen-robot-ordered / -assigned events,
+# The Queen's queue is not kept here: the server emits queen-worker-ordered / worker-assigned events,
 # Flink folds them into the queens_orders topic, and QueensOrdersConsumer feeds the store.
 # These endpoints only forward the Queen's commands; the dashboard updates from the topic.
-@app.post("/api/order-robot")
+@app.post("/api/order-worker-beee")
 async def order_robot(req: OrderRobotRequest):
     _require_connection()
-    cmd_url = f"{config.simulation_server_url}/v1/simulations/{store.active_simulation_id}/order-robot"
+    cmd_url = f"{config.simulation_server_url}/v1/simulations/{store.active_simulation_id}/order-worker-beee"
     body: Dict[str, Any] = {"robot_type": req.robot_type, "station": req.station}
     if store.run_generation > 0:
         body["expected_generation"] = store.run_generation

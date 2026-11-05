@@ -16,6 +16,8 @@ export interface GatheringProps {
   active?: boolean;
   /** Accessible name only; no resource heading is drawn. */
   resourceName?: string;
+  /** Fill and outline of the animated return-trip dots. Defaults to the light blue theme colors. */
+  dotColors?: { fill: string; stroke: string };
   className?: string;
   style?: CSSProperties;
 }
@@ -29,7 +31,7 @@ const RETURN_PATHS = [
 ] as const;
 
 /** Borderless gathering diagram. No purchases or simulation timing run internally. */
-export function Gathering({ counts, onAdd, disabled = false, readOnly = false, active = true, resourceName = 'Resource', className = '', style }: GatheringProps) {
+export function Gathering({ counts, onAdd, disabled = false, readOnly = false, active = true, resourceName = 'Resource', dotColors, className = '', style }: GatheringProps) {
   const eligible = nextEligible(counts);
   const lock = useRef(false);
   const [pending, setPending] = useState(false);
@@ -57,7 +59,7 @@ export function Gathering({ counts, onAdd, disabled = false, readOnly = false, a
           <path d="M280 235 H480" stroke={counts[3] ? blue : inactive}/>
         </g>
         {active && counts.map((count, index) => count > 0 && (
-          <circle key={`${index}-${count}`} className="gathering__dot" r="12" fill="var(--gathering-dot, #bde7ff)" stroke={blue} strokeWidth="1">
+          <circle key={`${index}-${count}`} className="gathering__dot" r="15" fill={dotColors?.fill ?? 'var(--gathering-dot, #bde7ff)'} stroke={dotColors?.stroke ?? blue} strokeWidth="1">
             <animateMotion
               path={RETURN_PATHS[index]}
               dur={`${TRAVEL_SECONDS[count as 1 | 2 | 3]}s`}

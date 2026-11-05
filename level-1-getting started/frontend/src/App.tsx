@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ConnectionIssues } from './components/ConnectionIssues';
 import { Header } from './components/Header';
+import { SchemaWarnings } from './components/SchemaWarnings';
 import { Sidebar } from './components/Sidebar';
 import { DEFAULT_LEVEL_ID, LEVELS } from './levels/registry';
 import { Level4Provider } from './levels/level4/Level4Context';
@@ -126,6 +127,10 @@ export const App: React.FC = () => {
             isReady={isReady}
           />
           <main className="flex-1 min-h-0 overflow-auto">
+            {/* The connection error already explains a schema problem, so only warn when it is not showing. */}
+            {!connectionFailed && state.schema_warnings.length > 0 && (
+              <SchemaWarnings warnings={state.schema_warnings} />
+            )}
             {connectionFailed ? (
               <ConnectionIssues issues={state.connection_issues} />
             ) : isUnlocked ? (

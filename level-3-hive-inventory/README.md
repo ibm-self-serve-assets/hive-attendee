@@ -337,11 +337,11 @@ The rate of gathering resource is determined by the number of Gatherers at each 
 
 Each waypoint can host a max of three Gatherers for a max of 12 Gatherers per resource.
 
-<img src="screenshots/inventory_in_ui.png"/>
+<img src="screenshots/resource_gathering.png"/>
 
 ### Manufacturing and Assembly Workstation
 
-In Level 2, you discovered the workstations were gathering resources and manufacturing parts at different rates: 10 mins, 5 mins and 3 mins. To simplify the visual depiction for this rate of production, each workstation Tier now displays as a hexagon graphic:
+In Level 2, you discovered the workstations were gathering resources and manufacturing parts at different rates: 10 mins, 5 mins and 3 mins. To simplify the visual depiction for this rate of production, each workstation Tier now displays as a hexagon graphic.  At start though, your Hive's workstations are all Tier 1:
 
 - Tier 1 = 1 chevron = 1 unit per 10 mins
 - Tier 2 = 2 chevrons = 1 unit per 5 mins
@@ -361,8 +361,8 @@ You may be asking yourself, what is the motivating force behind manufacturing th
 
 Level 4 introduces the Queen and her orders for additional workers. The Queen can place orders for new Workers plus assign them to specific tasks. And as you guessed, Kafka events are generated to let us know about the Queen's requests:
 
-- `queen-robot-ordered`
-- `queen-robot-assigned`
+- `queen-worker-ordered`
+- `worker-assigned`
 
 Your task in Level 4 will be aggregating these into a new `queens_orders` topic to track progress of this activity. Using Flink again, you will turn those events into a live queue that the assembly line works through, first in first out.  
 

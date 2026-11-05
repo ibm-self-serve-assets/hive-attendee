@@ -1,9 +1,12 @@
 import asyncio
+import json
 import logging
-from typing import Awaitable, Callable, List, Optional, Tuple
+import urllib.parse
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 import httpx
 
+from backend import connection_issues as ci
 from backend.log_setup import MAJOR
 from backend.store import DashboardStore
 
@@ -20,17 +23,48 @@ except ImportError:
 POLL_SECONDS = 3.0
 
 
-def fetch_event_topic_names(server_url: str, token: Optional[str], attendee_id: Optional[str]) -> List[str]:
-    """
-    Topic names the Level 1 provisioning script creates: the ``topic`` of every entry the
-    Simulation server publishes at GET /v1/schemas. Raises on any failure.
-    """
+def fetch_published_schemas(server_url: str, token: Optional[str], attendee_id: Optional[str]) -> List[Dict[str, Any]]:
+    """What the Simulation server publishes right now at GET /v1/schemas. Raises on any failure."""
     headers = {"Authorization": f"Bearer {token}"}
     if attendee_id:
         headers["X-Attendee-Id"] = attendee_id
     r = httpx.get(f"{server_url}/v1/schemas", headers=headers, timeout=8.0)
     r.raise_for_status()
-    return [s["topic"] for s in r.json()["subjects"]]
+    return r.json()["subjects"]
+
+
+def fetch_event_topic_names(server_url: str, token: Optional[str], attendee_id: Optional[str]) -> List[str]:
+    """
+    Topic names the Level 1 provisioning script creates: the ``topic`` of every entry the
+    Simulation server publishes at GET /v1/schemas. Raises on any failure.
+    """
+    return [s["topic"] for s in fetch_published_schemas(server_url, token, attendee_id)]
+
+
+def fetch_registered_schema(sr_url: str, api_key: str, api_secret: str, subject: str) -> Optional[str]:
+    """
+    The latest schema registered for ``subject`` in the attendee's Schema Registry, or None when
+    the subject does not exist. Read-only. Raises on any other failure (including bad credentials).
+    """
+    quoted = urllib.parse.quote(subject, safe="")
+    r = httpx.get(
+        f"{sr_url}/subjects/{quoted}/versions/latest",
+        auth=(api_key, api_secret),
+        headers={"Accept": "application/vnd.schemaregistry.v1+json"},
+        timeout=8.0,
+    )
+    if r.status_code == 404:
+        return None
+    r.raise_for_status()
+    return r.json().get("schema")
+
+
+def schemas_equal(registered: Optional[str], published: str) -> bool:
+    """Compare two JSON Schema documents ignoring whitespace and key order."""
+    try:
+        return json.loads(registered or "") == json.loads(published)
+    except ValueError:
+        return False
 
 
 # Called with a level label when that level's gate goes from not met to met.
@@ -58,7 +92,7 @@ class EventTopicsWatcher:
         self.store = store
         self.on_change = on_change
         self.on_unlocked = on_unlocked
-        # Returns the event topic names. Asked again on every poll until it succeeds once.
+        # Returns the event topic names. Asked again on every poll.
         self._topic_source = topic_source
         self._topics: Optional[List[str]] = None
         self._conf = {
@@ -85,10 +119,15 @@ class EventTopicsWatcher:
     def _missing_topics(self) -> List[str]:
         # List all topics rather than asking for them by name, so a missing topic
         # is never auto-created by the metadata request.
-        # The list comes from the Simulation server; ask once and keep it. If the server is
-        # not reachable yet this raises, the gate stays locked and the next poll tries again.
-        if self._topics is None:
+        # The list comes from the Simulation server and is asked again on every poll, so a
+        # changed list is noticed. If the server cannot be reached, the last list it gave is
+        # used; before it has answered once this raises, the gate stays locked and the next
+        # poll tries again.
+        try:
             self._topics = self._topic_source()
+        except Exception:
+            if self._topics is None:
+                raise
         topics = self._topics
         meta = AdminClient(self._conf, logger=kafka_logger).list_topics(timeout=5)
         return [
@@ -338,4 +377,71 @@ class QueensOrdersWatcher:
             await asyncio.sleep(POLL_SECONDS)
 
 
+SCHEMA_POLL_SECONDS = 5.0
 
+
+class SchemaWatcher:
+    """
+    Keeps `store.schema_warnings` current. Every poll it asks the Simulation server what schemas it
+    publishes now (nothing is cached), reads the latest schema of each subject from the attendee's
+    Schema Registry, and warns about subjects that are missing or hold a different schema.
+
+    It only reads. The attendee owns Confluent and fixes a warning with register_schemas.sh.
+    `clean` is True once a check has completed and found nothing wrong, so the dashboard can tell
+    "fixed" from "not checked yet" when it decides whether to connect again.
+    """
+
+    def __init__(
+        self,
+        store: DashboardStore,
+        on_change: Callable[[], Awaitable[None]],
+        published_source: Optional[Callable[[], List[Dict[str, Any]]]],
+        registered_source: Optional[Callable[[str], Optional[str]]],
+    ):
+        self.store = store
+        self.on_change = on_change
+        self.clean = False
+        self._published_source = published_source
+        self._registered_source = registered_source
+        self._enabled = bool(published_source and registered_source)
+        self._task: Optional[asyncio.Task] = None
+
+    def start(self) -> None:
+        if not self._enabled or self._task:
+            return
+        self._task = asyncio.create_task(self._run())
+
+    def stop(self) -> None:
+        if self._task:
+            self._task.cancel()
+            self._task = None
+
+    def _check(self) -> List[ci.Issue]:
+        missing: List[str] = []
+        differ: List[str] = []
+        for entry in self._published_source():
+            registered = self._registered_source(entry["subject"])
+            if registered is None:
+                missing.append(entry["subject"])
+            elif not schemas_equal(registered, entry["schema"]):
+                differ.append(entry["subject"])
+        return ci.schema_warnings(missing, differ)
+
+    async def _run(self) -> None:
+        while True:
+            try:
+                warnings = [w.to_dict() for w in await asyncio.to_thread(self._check)]
+                if warnings != self.store.schema_warnings:
+                    self.store.schema_warnings = warnings
+                    if warnings:
+                        logger.info("Schema warning: " + "; ".join(w["message"] for w in warnings), extra=MAJOR)
+                    else:
+                        logger.info("Schemas in your Schema Registry match the Simulation server.", extra=MAJOR)
+                    await self.on_change()
+                self.clean = not warnings
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                # Server or registry unreachable: keep the last result rather than guess.
+                logger.debug(f"Schema check failed: {e}")
+            await asyncio.sleep(SCHEMA_POLL_SECONDS)

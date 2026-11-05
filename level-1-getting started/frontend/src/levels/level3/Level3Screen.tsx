@@ -84,11 +84,11 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
   const stationTier = (stationId: string) => stationSlots[stationId]?.[0]?.tier ?? 1;
 
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div className="flex-1 overflow-auto p-3">
       <div className="flex items-start gap-0 min-w-0">
 
         {/* ── Column 1: Resource gathering ──────────────────────────────── */}
-        <div className="flex-[4] flex flex-col gap-4 min-w-0">
+        <div className="flex-[4] flex flex-col gap-2 min-w-0">
           {/* Inventory */}
           <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-4">
             <h2 className="text-[#2850B8] font-bold text-sm mb-3">Resource inventory</h2>
@@ -113,7 +113,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         <img src={icon} width={28} height={28} alt={label} style={{ objectFit: 'contain' }} />
                         <span className="text-sm font-semibold text-[#031040]">{label}</span>
                       </div>
-                      <GatheringStation tier={stationTier(id)} resourceName={label} />
+                      <GatheringStation tier={stationTier(id)} resourceName={label} running={running} />
                     </div>
                   );
                 })}
@@ -126,7 +126,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
         <FlowDots running={running} />
 
         {/* ── Column 2: Parts manufacturing ─────────────────────────────── */}
-        <div className="flex-[3] flex flex-col gap-4 min-w-0">
+        <div className="flex-[3] flex flex-col gap-2 min-w-0">
           {/* Inventory */}
           <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-4">
             <h2 className="text-[#2850B8] font-bold text-sm mb-3">Parts inventory</h2>

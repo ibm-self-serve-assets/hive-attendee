@@ -24,15 +24,15 @@ const describeOrder = (order: QueenOrder) => {
     : `${robot} to upgrade the ${station} workstation`;
 };
 
-/** Up arrow for an upgrade, plus sign for a new workstation (builder). 22px tall, like the station icon. */
+/** Up arrow for an upgrade, plus sign for a new workstation (builder). 28px tall, like the station icon. */
 const ActionGlyph: React.FC<{ action: QueenOrder['action'] }> = ({ action }) =>
   action === 'add' ? (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" className="flex-none">
-      <path d="M11 2v18M2 11h18" stroke="#031040" strokeWidth="2.5" strokeLinecap="round" />
+    <svg width="28" height="28" viewBox="0 0 22 22" fill="none" aria-hidden="true" className="flex-none">
+      <path d="M11 2v18M2 11h18" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
     </svg>
   ) : (
-    <svg width="14" height="22" viewBox="0 0 14 22" fill="none" aria-hidden="true" className="flex-none">
-      <path d="M7 20V2M1.5 7.5L7 2l5.5 5.5" stroke="#031040" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="18" height="28" viewBox="0 0 14 22" fill="none" aria-hidden="true" className="flex-none">
+      <path d="M7 20V2M1.5 7.5L7 2l5.5 5.5" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 
@@ -76,11 +76,11 @@ export const AssemblyQueue: React.FC<AssemblyQueueProps> = ({ queue }) => {
 
   if (queue.length === 0) {
     return (
-      <div className="rounded-xl border border-[#E0E8F8] bg-white px-3 py-2">
+      <div className="rounded-2xl bg-[#1232D0] px-4 py-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-[#2850B8] font-bold text-sm">Queen's Orders</h2>
+          <h2 className="text-white font-bold text-base">Queen's orders</h2>
         </div>
-        <div className="text-xs text-[#57606A] italic py-1">Queue is empty</div>
+        <div className="text-xs text-white/70 italic py-1">Queue is empty</div>
       </div>
     );
   }
@@ -96,27 +96,25 @@ export const AssemblyQueue: React.FC<AssemblyQueueProps> = ({ queue }) => {
   const remainingCount = queue.length - visibleCount;
 
   return (
-    <div className="rounded-xl border border-[#E0E8F8] bg-white px-3 py-2">
+    <div className="rounded-2xl bg-[#1232D0] px-4 py-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[#2850B8] font-bold text-sm">Queen's Orders</h2>
+        <h2 className="text-white font-bold text-base">Queen's orders</h2>
       </div>
-      <div ref={containerRef} className="flex items-end gap-2 pt-1.5 pb-1 overflow-hidden min-w-0">
+      <div ref={containerRef} className="flex items-end gap-2 pt-2 pb-1 overflow-hidden min-w-0">
         {visibleItems.map((order, idx) => {
           const isNext = idx === 0;
           const icon = stationIcon(order.station);
           return (
             <div key={order.order_id} className="flex flex-col items-center gap-1 flex-none">
               <div
-                className={`w-[72px] h-9 rounded-md flex items-center justify-center gap-1.5 text-md select-none ${
-                  isNext
-                    ? 'bg-[#FEF0CE] border-2 border-[#D48207] text-[#031040]'
-                    : 'bg-[#FEF0CE] border border-[#E5B869] text-[#031040]'
+                className={`w-[72px] h-11 rounded-xl flex items-center justify-center gap-1.5 text-md select-none bg-[#0C1850] ${
+                  isNext ? 'border-2 border-[#F5B84A]' : 'border-2 border-transparent'
                 }`}
                 title={describeOrder(order)}
               >
                 <ActionGlyph action={order.action} />
                 {icon ? (
-                  <img src={icon} width={22} height={22} alt={order.station} className="flex-none" />
+                  <img src={icon} width={28} height={28} alt={order.station} className="flex-none" />
                 ) : (
                   <span className="text-xs">{order.station.charAt(0).toUpperCase()}</span>
                 )}
@@ -126,7 +124,7 @@ export const AssemblyQueue: React.FC<AssemblyQueueProps> = ({ queue }) => {
         })}
         {showOverflow && remainingCount > 0 && (
           <div
-            className="w-8 h-9 rounded-md flex items-center justify-center text-xs font-semibold select-none bg-[#FEF0CE] border border-[#E5B869] text-[#031040] flex-none"
+            className="w-8 h-11 rounded-xl flex items-center justify-center text-xs font-semibold select-none bg-[#0C1850] text-white flex-none"
             title={`${remainingCount} more order${remainingCount > 1 ? 's' : ''} in queue`}
           >
             +{remainingCount}

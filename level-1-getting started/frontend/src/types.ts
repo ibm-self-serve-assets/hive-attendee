@@ -121,10 +121,21 @@ export interface DashboardState {
   // simulation_config from simulation.initialized — null until the event is received
   simulation_config: SimulationConfig | null;
 
+  /** Live station tiers: station_id → current tier. Seeded from station_initial_tiers,
+   *  then updated whenever a *.upgraded event arrives. */
+  station_tiers?: Record<string, number>;
+
+  /** Live station slots: station_id → list of { id, tier } objects.
+   *  One entry per parallel slot; a Builder order appends a new entry. */
+  station_slots?: Record<string, Array<{ id: number; tier: number }>>;
+
   // Whether the backend has connected your dashboard to the Simulation server and Confluent.
   connection_status: 'connecting' | 'connected' | 'failed';
   // Why the connection failed; empty unless connection_status is 'failed'.
   connection_issues: ConnectionIssue[];
+  // Schemas in your Schema Registry that do not match the Simulation server. Warning only;
+  // run register_schemas.sh to fix. Empty when they match (or have not been checked yet).
+  schema_warnings: ConnectionIssue[];
 }
 
 export const EMPTY_STATE: DashboardState = {
@@ -157,6 +168,7 @@ export const EMPTY_STATE: DashboardState = {
   simulation_config: null,
   connection_status: 'connecting',
   connection_issues: [],
+  schema_warnings: [],
 };
 
 /**

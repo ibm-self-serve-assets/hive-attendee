@@ -14,7 +14,7 @@ Head to **[Level 1 — Getting Started](level-1-getting-started/README.md)** to 
 | 1 | Environment Setup | Connect to Confluent Cloud, provision topics, launch the Hive Dashboard |
 | 2 | Intro to Apache Flink | Interval joins → job duration stream (`workstation_efficiency`) |
 | 3 | Hive Inventory | Stateful aggregations → live inventory balances (`resource_inventory`, `parts_inventory`) |
-| 4 | Queen's Orders | Event-sourced robot orders → live order queue (`queens_orders`) |
+| 4 | Queen's Orders | Orders for new worker bees → live order queue (`queens_orders`) |
 | 5 | Part Prioritization *(planned)* | Join the Queen's queue with recipe inputs → parts manufacturing queue |
 | 6 | Gamified UI *(planned)* | Play the Hive from a game-style dashboard |
 | 7 | Tableflow *(planned)* | Materialize streams as Apache Iceberg tables |
@@ -31,5 +31,5 @@ The HIVE platform is built around an event-driven architecture connecting a host
 
 1. **Simulation Server (Hosted Engine)**: Simulates the robotics manufacturing floor (gathering raw materials, fabricating parts, and assembling robots). It receives attendee lifecycle commands (Start, Pause, Stop, Restart) over HTTP REST and writes raw event logs directly to Confluent Cloud.
 2. **Confluent Cloud (Event Streaming Backbone)**: Provides managed Apache Kafka topics for each event type (e.g., `gathering-started`, `manufacturing-completed`, `simulation-state`), backed by Schema Registry for event contract governance.
-3. **Apache Flink SQL (Stream Processing)**: Continuously joins, enriches, and aggregates raw event streams in real time (calculating job durations, tracking live inventory balances and folding the Queen's robot orders into a live queue), outputting enriched streams back to Kafka and downstream storage.
+3. **Apache Flink SQL (Stream Processing)**: Continuously joins, enriches, and aggregates raw event streams in real time (calculating job durations, tracking live inventory balances and folding the Queen's orders for new Worker bees into a live queue), outputting enriched streams back to Kafka and downstream storage.
 4. **Attendee Dashboard (FastAPI Backend + React UI)**: Runs locally on your machine. The Python backend consumes events directly from your Confluent Cloud cluster and streams live state updates to the React frontend over Server-Sent Events (SSE).

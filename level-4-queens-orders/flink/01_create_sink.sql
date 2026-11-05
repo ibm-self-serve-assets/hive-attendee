@@ -7,10 +7,10 @@
 --   keyed by (simulation_id, run_id, order_id).  The row is updated as the
 --   order moves through its life:
 --
---     OPEN         queen-robot-ordered     the Queen placed the order
+--     OPEN         queen-worker-ordered     the Queen placed the order
 --     IN_ASSEMBLY  assembly-started        a robot is being built for it
 --                                          (the order has left the queue)
---     ASSIGNED     queen-robot-assigned    the finished robot was assigned
+--     ASSIGNED     worker-assigned    the finished robot was assigned
 --
 -- SCHEMA DESIGN
 --   robot_type : 'gatherer' | 'engineer' | 'builder'
@@ -39,7 +39,7 @@ CREATE TABLE `queens_orders` (
   `robot_type`    STRING,          -- 'gatherer' | 'engineer' | 'builder'
   `station`       STRING,          -- workstation the robot will be applied to, e.g. 'resin'
   `action`        STRING,          -- 'upgrade' | 'add'
-  `placed_seq`    BIGINT,          -- event_sequence of queen-robot-ordered (queue position)
+  `placed_seq`    BIGINT,          -- event_sequence of queen-worker-ordered (queue position)
   `status`        STRING,          -- 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED'
   PRIMARY KEY (`simulation_id`, `run_id`, `order_id`) NOT ENFORCED
 )
