@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ConnectionIssues } from './components/ConnectionIssues';
-import { Header } from './components/Header';
+import { Header, TabId } from './components/Header';
 import { SchemaWarnings } from './components/SchemaWarnings';
 import { Sidebar } from './components/Sidebar';
 import { DEFAULT_LEVEL_ID, LEVELS } from './levels/registry';
@@ -13,7 +13,23 @@ function levelIdFromHash(): string {
   return LEVELS.find((l) => l.id === hash)?.id ?? DEFAULT_LEVEL_ID;
 }
 
+const TAB_LOCKED_MESSAGES: Record<Exclude<TabId, 'robotics'>, { title: string; message: string }> = {
+  queen: {
+    title: 'Queen',
+    message: 'You have not completed enough levels to unlock the Queen.',
+  },
+  assets: {
+    title: 'Assets',
+    message: 'You have not-yet-upgraded your Robotics workflow enough to access the data in this tab.',
+  },
+  colony: {
+    title: 'Colony',
+    message: 'This functionality is not-yet-available to you.',
+  },
+};
+
 export const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<TabId>('robotics');
   const [state, setState] = useState<DashboardState>(EMPTY_STATE);
   const [levelId, setLevelId] = useState(levelIdFromHash);
   const level = LEVELS.find((l) => l.id === levelId) ?? LEVELS[0];
@@ -115,7 +131,7 @@ export const App: React.FC = () => {
   return (
     <Level4Provider state={state}>
       <div className="h-screen flex flex-col overflow-hidden" style={{ background: '#F4F7FC' }}>
-        <Header />
+        <Header activeTab={activeTab} onTabChange={setActiveTab} />
 
         <div className="flex-1 min-h-0 flex overflow-hidden">
           <Sidebar
@@ -127,17 +143,31 @@ export const App: React.FC = () => {
             isReady={isReady}
           />
           <main className="flex-1 min-h-0 overflow-auto">
-            {/* The connection error already explains a schema problem, so only warn when it is not showing. */}
-            {!connectionFailed && state.schema_warnings.length > 0 && (
-              <SchemaWarnings warnings={state.schema_warnings} />
+            {activeTab === 'robotics' ? (
+              <>
+                {/* The connection error already explains a schema problem, so only warn when it is not showing. */}
+                {!connectionFailed && state.schema_warnings.length > 0 && (
+                  <SchemaWarnings warnings={state.schema_warnings} />
+                )}
+                {connectionFailed ? (
+                  <ConnectionIssues issues={state.connection_issues} />
+                ) : isUnlocked ? (
+                  <Screen state={state} />
+                ) : Requirements ? (
+                  <Requirements state={state} />
+                ) : null}
+              </>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center px-6">
+                <img src="/icons/svg/lock.svg" width={96} height={96} alt="Locked" />
+                <h2 className="mt-3 text-2xl font-bold text-[#031040]">
+                  {TAB_LOCKED_MESSAGES[activeTab].title}
+                </h2>
+                <p className="mt-2 max-w-md text-lg text-[#3A4A7A] leading-snug">
+                  {TAB_LOCKED_MESSAGES[activeTab].message}
+                </p>
+              </div>
             )}
-            {connectionFailed ? (
-              <ConnectionIssues issues={state.connection_issues} />
-            ) : isUnlocked ? (
-              <Screen state={state} />
-            ) : Requirements ? (
-              <Requirements state={state} />
-            ) : null}
           </main>
         </div>
       </div>

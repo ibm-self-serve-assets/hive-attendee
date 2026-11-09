@@ -137,7 +137,7 @@ def _sr_request(method: str, url: str, auth: str):
 
 def _event_topic_names(server_url: str, token: str, attendee_id: str) -> list[str]:
     """
-    The 14 event topics from the Simulation server, so their subjects are also found when the
+    The 17 event topics from the Simulation server, so their subjects are also found when the
     topics are already gone. If the server cannot be reached, only the subjects of topics that
     still exist are found, and a note says so.
     """

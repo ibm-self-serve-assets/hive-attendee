@@ -1,11 +1,12 @@
 from backend.store import DashboardStore
 
 
-def _order(order_id, placed_seq, status="OPEN", robot_type="gatherer", station="resin", action="upgrade"):
+def _order(order_id, placed_seq, status="OPEN", robot_type="gatherer", workstation_type="resin", workstation_id=1, action="upgrade"):
     return {
         "order_id": order_id,
         "robot_type": robot_type,
-        "station": station,
+        "workstation_type": workstation_type,
+        "workstation_id": workstation_id,
         "action": action,
         "placed_seq": placed_seq,
         "status": status,

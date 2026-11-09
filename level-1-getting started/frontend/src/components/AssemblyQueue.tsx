@@ -1,9 +1,9 @@
 import React from 'react';
 import type { QueenOrder } from '../types';
-import { PART_ICON, RESOURCE_ICON, RESOURCES, ROBOTS, STATIONS } from '../levels/robots';
+import { PARTS, PART_ICON, RESOURCE_ICON, RESOURCES, ROBOTS, STATIONS } from '../levels/robots';
 
-const ITEM_WIDTH = 72; // w-[72px]
-const ITEM_GAP = 8;    // gap-2 = 8px
+const ITEM_WIDTH = 200; // min width of a card; cards grow to fill the row
+const ITEM_GAP = 8;     // gap-2 = 8px
 
 /** Icon of the workstation an order applies to: a resource station or a parts station. */
 const stationIcon = (station: string): string | undefined => RESOURCE_ICON[station] ?? PART_ICON[station];
@@ -18,23 +18,87 @@ const stationLabel = (id: string) =>
 /** e.g. "Gatherer to upgrade the Resin workstation", "Builder to build a new Actuator workstation". */
 const describeOrder = (order: QueenOrder) => {
   const robot = robotLabel(order.robot_type);
-  const station = stationLabel(order.station);
+  const station = stationLabel(order.workstation_type);
   return order.action === 'add'
     ? `${robot} to build a new ${station} workstation`
     : `${robot} to upgrade the ${station} workstation`;
 };
 
-/** Up arrow for an upgrade, plus sign for a new workstation (builder). 28px tall, like the station icon. */
+const GLYPH_COLOR = '#1F2A44';
+
+/** Up arrow for an upgrade, plus sign for a new workstation (builder). */
 const ActionGlyph: React.FC<{ action: QueenOrder['action'] }> = ({ action }) =>
   action === 'add' ? (
-    <svg width="28" height="28" viewBox="0 0 22 22" fill="none" aria-hidden="true" className="flex-none">
-      <path d="M11 2v18M2 11h18" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" className="flex-none">
+      <path d="M11 3v16M3 11h16" stroke={GLYPH_COLOR} strokeWidth="2.5" strokeLinecap="round" />
     </svg>
   ) : (
-    <svg width="18" height="28" viewBox="0 0 14 22" fill="none" aria-hidden="true" className="flex-none">
-      <path d="M7 20V2M1.5 7.5L7 2l5.5 5.5" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="16" height="22" viewBox="0 0 14 22" fill="none" aria-hidden="true" className="flex-none">
+      <path d="M7 20V3M1.5 8.5L7 3l5.5 5.5" stroke={GLYPH_COLOR} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
+
+const CrownIcon: React.FC = () => (
+  <svg width="28" height="22" viewBox="0 0 28 22" fill="#1A56F0" aria-hidden="true" className="flex-none">
+    <path d="M1 5l6.5 5L14 1l6.5 9L27 5l-2.5 15h-21z" />
+  </svg>
+);
+
+const QueenTitle: React.FC = () => (
+  <div className="flex items-center gap-2.5">
+    <CrownIcon />
+    <h2 className="text-[#1A56F0] font-bold text-2xl">Queen's orders</h2>
+  </div>
+);
+
+/** One order: the robot, what it will do (a pill with the workstation icon and an arrow or plus), and the parts it needs. */
+const OrderCard: React.FC<{ order: QueenOrder; isNext: boolean }> = ({ order, isNext }) => {
+  const icon = stationIcon(order.workstation_type);
+  const robot = ROBOTS.find((r) => r.id === order.robot_type);
+  const parts = order.parts;
+  return (
+    <div
+      className={`flex-1 min-w-[200px] max-w-[340px] rounded-xl px-3 py-2.5 flex flex-col gap-2 select-none ${
+        isNext ? 'border-2 border-[#1A56F0] bg-[#EEF3FF]' : 'border-2 border-[#D5DDF0] bg-[#F7F9FD]'
+      }`}
+      title={describeOrder(order)}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {robot && <img src={robot.icon} width={34} height={34} alt="" className="flex-none" style={{ objectFit: 'contain' }} />}
+          <span className="h-6 w-px bg-[#C9D3EA] flex-none" aria-hidden="true" />
+          <span className="text-[#1F2A44] text-base font-semibold truncate">{robotLabel(order.robot_type)}</span>
+        </div>
+        <div className="flex items-center gap-1 flex-none rounded-full bg-[#DDE6F7] px-3 py-1">
+          {icon ? (
+            <img src={icon} width={22} height={22} alt={order.workstation_type} className="flex-none" />
+          ) : (
+            <span className="text-xs text-[#1F2A44]">{order.workstation_type.charAt(0).toUpperCase()}</span>
+          )}
+          <ActionGlyph action={order.action} />
+        </div>
+      </div>
+      {/* No row until the parts arrive (a separate Flink job), rather than zeros. */}
+      {parts && (
+        <div>
+          <div className="text-sm font-semibold text-[#1F2A44] mb-1.5">Parts required</div>
+          <div className="flex items-center">
+            {PARTS.map(({ id, label }, i) => (
+              <span
+                key={id}
+                className={`flex-1 inline-flex items-center justify-center gap-1 ${i > 0 ? 'border-l border-[#C9D3EA]' : ''}`}
+                title={label}
+              >
+                <img src={PART_ICON[id]} width={22} height={22} alt={label} style={{ objectFit: 'contain' }} />
+                <span className="text-sm font-semibold text-[#1F2A44] tabular-nums">×{parts[id as keyof typeof parts] ?? 0}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export interface AssemblyQueueProps {
   /** The Queen's open orders, first in first out. */
@@ -72,15 +136,14 @@ export const AssemblyQueue: React.FC<AssemblyQueueProps> = ({ queue }) => {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+    // The row only exists while the queue has orders, so look again when that changes.
+  }, [queue.length === 0]);
 
   if (queue.length === 0) {
     return (
-      <div className="rounded-2xl bg-[#1232D0] px-4 py-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-white font-bold text-base">Queen's orders</h2>
-        </div>
-        <div className="text-xs text-white/70 italic py-1">Queue is empty</div>
+      <div className="rounded-2xl bg-white border-2 border-[#C9D9FB] px-4 py-3">
+        <QueenTitle />
+        <div className="text-xs text-[#57606a] italic py-1">Queue is empty</div>
       </div>
     );
   }
@@ -96,35 +159,15 @@ export const AssemblyQueue: React.FC<AssemblyQueueProps> = ({ queue }) => {
   const remainingCount = queue.length - visibleCount;
 
   return (
-    <div className="rounded-2xl bg-[#1232D0] px-4 py-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-white font-bold text-base">Queen's orders</h2>
-      </div>
-      <div ref={containerRef} className="flex items-end gap-2 pt-2 pb-1 overflow-hidden min-w-0">
-        {visibleItems.map((order, idx) => {
-          const isNext = idx === 0;
-          const icon = stationIcon(order.station);
-          return (
-            <div key={order.order_id} className="flex flex-col items-center gap-1 flex-none">
-              <div
-                className={`w-[72px] h-11 rounded-xl flex items-center justify-center gap-1.5 text-md select-none bg-[#0C1850] ${
-                  isNext ? 'border-2 border-[#F5B84A]' : 'border-2 border-transparent'
-                }`}
-                title={describeOrder(order)}
-              >
-                <ActionGlyph action={order.action} />
-                {icon ? (
-                  <img src={icon} width={28} height={28} alt={order.station} className="flex-none" />
-                ) : (
-                  <span className="text-xs">{order.station.charAt(0).toUpperCase()}</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+    <div className="rounded-2xl bg-white border-2 border-[#C9D9FB] px-4 py-3">
+      <QueenTitle />
+      <div ref={containerRef} className="flex items-stretch gap-2 pt-2 pb-1 overflow-hidden min-w-0">
+        {visibleItems.map((order, idx) => (
+          <OrderCard key={order.order_id} order={order} isNext={idx === 0} />
+        ))}
         {showOverflow && remainingCount > 0 && (
           <div
-            className="w-8 h-11 rounded-xl flex items-center justify-center text-xs font-semibold select-none bg-[#0C1850] text-white flex-none"
+            className="w-10 self-stretch rounded-xl flex items-center justify-center text-xs font-semibold select-none bg-[#F7F9FD] border-2 border-[#D5DDF0] text-[#1F2A44] flex-none"
             title={`${remainingCount} more order${remainingCount > 1 ? 's' : ''} in queue`}
           >
             +{remainingCount}

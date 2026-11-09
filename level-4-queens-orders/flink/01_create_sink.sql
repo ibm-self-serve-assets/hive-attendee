@@ -14,7 +14,8 @@
 --
 -- SCHEMA DESIGN
 --   robot_type : 'gatherer' | 'engineer' | 'builder'
---   station    : the workstation the robot will be applied to
+--   workstation_type : the type of workstation the robot will be applied to, e.g. 'resin'
+--   workstation_id   : the workstation of that type to upgrade (1 to 4); NULL for a Builder order
 --   action     : 'upgrade' (gatherer, engineer) | 'add' (builder)
 --   placed_seq : event_sequence of the ordered event.  Sort OPEN rows by this
 --                to get the Queen's first-in, first-out queue.
@@ -37,7 +38,8 @@ CREATE TABLE `queens_orders` (
   `run_id`        STRING,          -- Simulation run; resets when the Simulation restarts
   `order_id`      STRING,          -- UUID created by the Queen when she orders the robot
   `robot_type`    STRING,          -- 'gatherer' | 'engineer' | 'builder'
-  `station`       STRING,          -- workstation the robot will be applied to, e.g. 'resin'
+  `workstation_type` STRING,       -- type of workstation the robot will be applied to, e.g. 'resin'
+  `workstation_id`   BIGINT,       -- workstation of that type to upgrade (1 to 4); NULL for a Builder order
   `action`        STRING,          -- 'upgrade' | 'add'
   `placed_seq`    BIGINT,          -- event_sequence of queen-worker-ordered (queue position)
   `status`        STRING,          -- 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED'

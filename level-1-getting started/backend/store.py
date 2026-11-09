@@ -7,8 +7,9 @@ Tracks only what the design comp needs:
   - completed counts     from *.completed event payloads
   - in-progress flags    from *.started / *.completed pairing
   - blocked state        from *.blocked event payloads
-  - workstation inputs       from *.started event payloads (full recipe inputs)
-  - job durations        from workstation_efficiency topic (elapsed_sim_minutes per station)
+  - workstation layout       from gathering/manufacturing/assembly .state events (tier per workstation)
+  - workstation inputs       from manufacturing.state / assembly.state (recipes), then *.started payloads
+  - job durations        from workstation_efficiency topic (elapsed_sim_minutes per workstation type)
   - Queen's orders       from queens_orders topic (one row per order, Level 4)
   - stream health
 """
@@ -27,7 +28,7 @@ logger = logging.getLogger("hive.store")
 # These lists must stay in sync with schemas/simulation_rules_private.json in hive-simulation.
 # They are used only to pre-zero completed/active counters before simulation.initialized arrives.
 # Assembly stations are not pre-zeroed here — the set is derived dynamically from
-# simulation_config.station_initial_tiers when simulation.initialized is ingested.
+# the *.state events.
 RESOURCE_STATIONS = ["copper", "energy", "metals", "resin", "silicon"]
 
 MANUFACTURING_STATIONS = [
@@ -36,6 +37,9 @@ MANUFACTURING_STATIONS = [
     "chassis",
     "electronics",
 ]
+
+# The parts a robot is built from (the columns of parts_priority_queue).
+PART_IDS = ("actuator", "battery", "chassis", "electronics")
 
 # Recent raw events kept per dashboard section (newest first), keyed by event_type prefix.
 EVENT_LOG_CATEGORIES = ("gathering", "manufacturing", "assembly")
@@ -51,15 +55,14 @@ class DashboardStore:
         self.run_id: Optional[str] = None
 
         # simulation_config from simulation.initialized — carries workstation tiers,
-        # station_initial_tiers.
+        # workstation_initial_tiers.
         # None until the first simulation.initialized event is ingested.
         self.simulation_config: Optional[Dict[str, Any]] = None
 
-        # Live station layout, updated by *.upgraded / *.added events.
-        # station_tiers: station_id → current tier (seeded from station_initial_tiers).
-        # station_slots: station_id → list of {id, tier} dicts (one slot per station initially).
-        self.station_tiers: Dict[str, int] = {}
-        self.station_slots: Dict[str, List[Dict]] = {}
+        # Live workstation layout, built from the gathering/manufacturing/assembly .state events
+        # (one message per workstation, the latest wins).
+        # workstations: workstation_type → list of {workstation_id, tier}, sorted by workstation_id.
+        self.workstations: Dict[str, List[Dict[str, int]]] = {}
 
         # sim time — updated from every envelope
         self.latest_sim_time_minutes: int = 0
@@ -72,29 +75,30 @@ class DashboardStore:
         # stream health tracking
         self._last_event_mono: float = 0.0
 
-        # Completed counts: station_id / station_id / robot_id → int
+        # Completed counts: workstation_type / workstation_type / robot_id → int
         self.gathering_completed: Dict[str, int] = {r: 0 for r in RESOURCE_STATIONS}
         self.manufacturing_completed: Dict[str, int] = {s: 0 for s in MANUFACTURING_STATIONS}
         self.assembly_completed: Dict[str, int] = {}  # output_type → count
 
         # Active jobs: tracks currently in-progress jobs per "slot"
-        # gathering: station_id → bool
-        # manufacturing / assembly: station_id → bool
+        # gathering: workstation_type → bool
+        # manufacturing / assembly: workstation_type → bool
         self.gathering_active: Dict[str, bool] = {r: False for r in RESOURCE_STATIONS}
         self.manufacturing_active: Dict[str, bool] = {s: False for s in MANUFACTURING_STATIONS}
         self.assembly_active: Dict[str, bool] = {}
 
-        # Blocked state: station/resource → missing_inputs dict (non-empty means blocked)
+        # Blocked state: workstation_type → missing_inputs dict (non-empty means blocked)
         self.manufacturing_blocked: Dict[str, Dict[str, int]] = {}
         self.assembly_blocked: Dict[str, Dict[str, int]] = {}
 
-        # Station inputs: captured from *.started payloads; station_id → inputs dict
+        # Workstation inputs: set from the manufacturing.state / assembly.state recipe at the start of a
+        # run (and refreshed from *.started payloads); workstation_type → inputs dict.
         # Preserved across jobs — shows the full recipe the workstation uses.
         self.manufacturing_inputs: Dict[str, Dict[str, int]] = {}
         self.assembly_inputs: Dict[str, Dict[str, int]] = {}
 
         # Job durations from workstation_efficiency (Flink output):
-        # station_id → latest elapsed_sim_minutes
+        # workstation_type → latest elapsed_sim_minutes
         self.job_durations: Dict[str, int] = {}
 
         # Inventory balances from resource_inventory & parts_inventory (Flink output), kept per run
@@ -104,10 +108,16 @@ class DashboardStore:
         self.inventory_by_run: Dict[str, Dict[str, Dict[str, int]]] = {}
 
         # The Queen's orders from queens_orders (Flink output), kept per run:
-        # run_id → order_id → {order_id, robot_type, station, action, placed_seq, status}
+        # run_id → order_id → {order_id, robot_type, workstation_type, workstation_id, action, placed_seq, status}
         # status: 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED'
         # Independent of reset(): rows can arrive before the new run's first event does.
         self.orders_by_run: Dict[str, Dict[str, Dict[str, Any]]] = {}
+
+        # The parts each order's robot needs, from parts_priority_queue (Flink output), kept per run:
+        # run_id → order_id → {actuator, battery, chassis, electronics}
+        # Same pattern as orders_by_run. The two topics come from separate Flink jobs, so an
+        # order can be in orders_by_run before its parts arrive; it then has no parts yet.
+        self.parts_by_run: Dict[str, Dict[str, Dict[str, int]]] = {}
 
         # Recent events per section, newest first (raw envelopes for the event panels)
         self.events: Dict[str, list] = {c: [] for c in EVENT_LOG_CATEGORIES}
@@ -130,6 +140,10 @@ class DashboardStore:
         # Level 4 gate: the queens_orders topic exists. Re-evaluated continuously.
         # Independent of the Simulation run, so reset() leaves it alone.
         self.queens_orders_ready: bool = False
+
+        # The parts_priority_queue topic exists. Only adds the "Parts required" row to the order
+        # cards; it does not lock or unlock a level. Independent of the Simulation run.
+        self.parts_priority_queue_ready: bool = False
 
         # Connection to the Simulation server / Confluent, set by auto_connect:
         #   'connecting' | 'connected' | 'failed'
@@ -168,8 +182,7 @@ class DashboardStore:
         self.job_durations = {}
         self.events = {c: [] for c in EVENT_LOG_CATEGORIES}
         self.simulation_config = None
-        self.station_tiers = {}
-        self.station_slots = {}
+        self.workstations = {}
         self._seen_ids.clear()
 
     def ingest(self, env: EventEnvelope) -> bool:
@@ -222,8 +235,7 @@ class DashboardStore:
             self.job_durations = {}
             self.events = {c: [] for c in EVENT_LOG_CATEGORIES}
             self.simulation_config = None
-            self.station_tiers = {}
-            self.station_slots = {}
+            self.workstations = {}
         elif env.sim_time_minutes > self.latest_sim_time_minutes:
             self.latest_sim_time_minutes = env.sim_time_minutes
         self._last_event_mono = time.monotonic()
@@ -248,13 +260,13 @@ class DashboardStore:
             return True
 
         if et == "gathering.started":
-            rid = p.get("station_id")
+            rid = p.get("workstation_type")
             if rid:
                 self.gathering_active[rid] = True
             return True
 
         if et == "gathering.completed":
-            rid = p.get("station_id")
+            rid = p.get("workstation_type")
             if rid:
                 self.gathering_active[rid] = False
                 self.gathering_completed[rid] = self.gathering_completed.get(rid, 0) + 1
@@ -266,7 +278,7 @@ class DashboardStore:
             return True
 
         if et == "manufacturing.started":
-            sid = p.get("station_id")
+            sid = p.get("workstation_type")
             if sid:
                 self.manufacturing_active[sid] = True
                 self.manufacturing_blocked.pop(sid, None)
@@ -276,7 +288,7 @@ class DashboardStore:
             return True
 
         if et == "manufacturing.completed":
-            sid = p.get("station_id")
+            sid = p.get("workstation_type")
             if sid:
                 self.manufacturing_active[sid] = False
                 self.manufacturing_blocked.pop(sid, None)
@@ -284,7 +296,7 @@ class DashboardStore:
             return True
 
         if et == "manufacturing.blocked":
-            sid = p.get("station_id")
+            sid = p.get("workstation_type")
             if sid:
                 self.manufacturing_active[sid] = False
                 missing = p.get("missing_inputs", {})
@@ -297,7 +309,7 @@ class DashboardStore:
             return True
 
         if et == "assembly.started":
-            sid = p.get("station_id")
+            sid = p.get("workstation_type")
             if sid:
                 self.assembly_active[sid] = True
                 self.assembly_blocked.pop(sid, None)
@@ -307,7 +319,7 @@ class DashboardStore:
             return True
 
         if et == "assembly.completed":
-            sid = p.get("station_id")
+            sid = p.get("workstation_type")
             output_type = p.get("output_type", sid)
             if sid:
                 self.assembly_active[sid] = False
@@ -317,7 +329,7 @@ class DashboardStore:
             return True
 
         if et == "assembly.blocked":
-            sid = p.get("station_id")
+            sid = p.get("workstation_type")
             if sid:
                 self.assembly_active[sid] = False
                 missing = p.get("missing_inputs", {})
@@ -328,43 +340,37 @@ class DashboardStore:
             cfg = p.get("simulation_config")
             if isinstance(cfg, dict):
                 self.simulation_config = cfg
-                # Seed the live layout from initial tiers (once per run).
-                initial_tiers: Dict[str, int] = cfg.get("station_initial_tiers", {})
-                if initial_tiers and not self.station_tiers:
-                    self.station_tiers = dict(initial_tiers)
-                    self.station_slots = {
-                        sid: [{"id": 1, "tier": tier}]
-                        for sid, tier in initial_tiers.items()
-                    }
             return True
 
-        if et in ("gathering.region.upgraded", "manufacturing.workstation.upgraded", "assembly.workstation.upgraded"):
-            sid = p.get("station_id")
-            new_tier = p.get("new_tier")
-            if sid and new_tier:
-                self.station_tiers[sid] = new_tier
-                # Update tier on the first slot (there is always at least one).
-                slots = self.station_slots.get(sid)
-                if slots:
-                    slots[0]["tier"] = new_tier
-            return True
-
-        if et in ("gathering.region.added", "manufacturing.workstation.added", "assembly.workstation.added"):
-            sid = p.get("station_id")
-            slot_index = p.get("slot_index")
-            tier = p.get("tier", 1)
-            if sid and slot_index:
-                slots = self.station_slots.setdefault(sid, [{"id": 1, "tier": self.station_tiers.get(sid, 1)}])
-                if slot_index > len(slots):
-                    slots.append({"id": slot_index, "tier": tier})
+        if et in ("gathering.state", "manufacturing.state", "assembly.state"):
+            wtype = p.get("workstation_type")
+            wid = p.get("workstation_id")
+            tier = p.get("tier")
+            if wtype and wid and tier:
+                self.ingest_workstation_state(wtype, int(wid), int(tier))
+                # The recipe is known from the start of a run, before any job has started.
+                recipe = p.get("resources_required") if et == "manufacturing.state" else p.get("parts_required")
+                if isinstance(recipe, dict):
+                    inputs = self.manufacturing_inputs if et == "manufacturing.state" else self.assembly_inputs
+                    inputs[wtype] = recipe
             return True
 
         # simulation.state etc. — still counted as activity
         return True
 
-    def ingest_calculated_value(self, station_id: str, elapsed_sim_minutes: int) -> bool:
-        """Update the latest job duration for a station_id."""
-        self.job_durations[station_id] = elapsed_sim_minutes
+    def ingest_workstation_state(self, workstation_type: str, workstation_id: int, tier: int) -> None:
+        """Set the tier of one workstation. The message carries the whole state, so replays are safe."""
+        layout = self.workstations.setdefault(workstation_type, [])
+        for entry in layout:
+            if entry["workstation_id"] == workstation_id:
+                entry["tier"] = tier
+                return
+        layout.append({"workstation_id": workstation_id, "tier": tier})
+        layout.sort(key=lambda e: e["workstation_id"])
+
+    def ingest_calculated_value(self, workstation_type: str, elapsed_sim_minutes: int) -> bool:
+        """Update the latest job duration for a workstation_type."""
+        self.job_durations[workstation_type] = elapsed_sim_minutes
         return True
 
     def ingest_inventory_balance(self, run_id: str, item_type: str, item_id: str, quantity: int) -> bool:
@@ -400,12 +406,29 @@ class DashboardStore:
         run[order_id] = merged
         return run_id == self.run_id and merged != previous
 
+    def ingest_order_parts(self, run_id: str, order_id: str, parts: Dict[str, Any]) -> bool:
+        """Set the parts one order's robot needs, from a parts_priority_queue row.
+
+        Parts that are null in the row (the recipe does not use them) are dropped.
+        Returns True only if the order belongs to the current run and its parts changed.
+        """
+        if not order_id:
+            return False
+        known = {k: int(v) for k, v in parts.items() if k in PART_IDS and v is not None}
+        run = self.parts_by_run.setdefault(run_id, {})
+        previous = run.get(order_id)
+        run[order_id] = known
+        return run_id == self.run_id and known != previous
+
     @property
     def queens_orders(self) -> List[Dict[str, Any]]:
         """All of the current run's orders, in the order the Queen placed them."""
         if not self.run_id:
             return []
         rows = self.orders_by_run.get(self.run_id, {}).values()
+        parts = self.parts_by_run.get(self.run_id, {})
+        # Attach the parts only when they have arrived, so the card shows no zeros in the gap.
+        rows = [{**o, "parts": dict(parts[o["order_id"]])} if parts.get(o["order_id"]) else o for o in rows]
         return sorted(rows, key=lambda o: (o.get("placed_seq") is None, o.get("placed_seq") or 0))
 
     @property
@@ -454,9 +477,9 @@ class DashboardStore:
             "workstation_efficiency_ready": self.workstation_efficiency_ready,
             "resource_inventory_ready": self.resource_inventory_ready,
             "queens_orders_ready": self.queens_orders_ready,
+            "parts_priority_queue_ready": self.parts_priority_queue_ready,
             "simulation_config": self.simulation_config,
-            "station_tiers": dict(self.station_tiers),
-            "station_slots": {sid: list(slots) for sid, slots in self.station_slots.items()},
+            "workstations": {t: [dict(w) for w in ws] for t, ws in self.workstations.items()},
             "connection_status": self.connection_status,
             "connection_issues": [dict(i) for i in self.connection_issues],
             "schema_warnings": [dict(i) for i in self.schema_warnings],

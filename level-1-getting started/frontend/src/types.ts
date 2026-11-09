@@ -5,11 +5,11 @@ export interface WorkstationTierConfig {
 }
 
 /** Configuration block published in simulation.initialized so the frontend never needs
- *  hardcoded copies of initial station tiers. */
+ *  hardcoded copies of initial workstation tiers. */
 export interface SimulationConfig {
   workstation_tiers: WorkstationTierConfig[];
-  /** station_id → initial tier number */
-  station_initial_tiers: Record<string, number>;
+  /** workstation_type → tier workstation 1 starts at */
+  workstation_initial_tiers: Record<string, number>;
 }
 
 /** A raw event envelope as received from Kafka (kept for the event panels). */
@@ -47,13 +47,17 @@ export interface ConnectionIssue {
 export interface QueenOrder {
   order_id: string;
   robot_type: 'gatherer' | 'engineer' | 'builder';
-  /** Workstation the robot will be applied to, e.g. 'resin'. */
-  station: string;
+  /** Type of workstation the robot will be applied to, e.g. 'resin'. */
+  workstation_type: string;
+  /** The workstation to upgrade (1 to 4); null for a Builder order. */
+  workstation_id: number | null;
   /** 'add' for a builder, 'upgrade' otherwise. */
   action: 'add' | 'upgrade';
   /** Queue position: event_sequence of the order. Lower is first. */
   placed_seq: number;
   status: 'OPEN' | 'IN_ASSEMBLY' | 'ASSIGNED';
+  /** Parts one robot of this type needs (from parts_priority_queue). Absent until that row arrives. */
+  parts?: Partial<Record<'actuator' | 'battery' | 'chassis' | 'electronics', number>>;
 }
 
 /** Shape of the state object sent from the backend SSE stream. */
@@ -72,7 +76,7 @@ export interface DashboardState {
   /** Orders whose robot is being built; they have left the queue. */
   orders_in_assembly?: QueenOrder[];
 
-  // Completed counts keyed by station_id / station_id / output_type
+  // Completed counts keyed by workstation_type / output_type
   gathering_completed: Record<string, number>;
   manufacturing_completed: Record<string, number>;
   assembly_completed: Record<string, number>;
@@ -82,16 +86,16 @@ export interface DashboardState {
   manufacturing_active: Record<string, boolean>;
   assembly_active: Record<string, boolean>;
 
-  // Blocked state: keyed by station_id / station_id; value is missing_inputs (or reason for gathering)
+  // Blocked state: keyed by workstation_type; value is missing_inputs (or reason for gathering)
   manufacturing_blocked: Record<string, Record<string, number>>;
   assembly_blocked: Record<string, Record<string, number>>;
 
-  // Recipe inputs captured from *.started events: station_id → { input_id → quantity }
+  // Recipe inputs captured from *.started events: workstation_type → { input_id → quantity }
   manufacturing_inputs: Record<string, Record<string, number>>;
   assembly_inputs: Record<string, Record<string, number>>;
 
   // Latest job durations from the workstation_efficiency Flink topic:
-  // station_id → elapsed_sim_minutes
+  // workstation_type → elapsed_sim_minutes
   job_durations: Record<string, number>;
 
   // Live inventory balances from the resource_inventory and parts_inventory Flink topics (Level 3).
@@ -118,16 +122,15 @@ export interface DashboardState {
   // True once the queens_orders topic exists (created by the attendee's Flink SQL) (unlocks Level 4)
   queens_orders_ready: boolean;
 
+  // True once the parts_priority_queue topic exists (Level 4, steps 4 to 6). Adds the parts to the order cards.
+  parts_priority_queue_ready: boolean;
+
   // simulation_config from simulation.initialized — null until the event is received
   simulation_config: SimulationConfig | null;
 
-  /** Live station tiers: station_id → current tier. Seeded from station_initial_tiers,
-   *  then updated whenever a *.upgraded event arrives. */
-  station_tiers?: Record<string, number>;
-
-  /** Live station slots: station_id → list of { id, tier } objects.
-   *  One entry per parallel slot; a Builder order appends a new entry. */
-  station_slots?: Record<string, Array<{ id: number; tier: number }>>;
+  /** Live workstations: workstation_type → list of { workstation_id, tier }, built from the
+   *  gathering/manufacturing/assembly .state events. Up to 4 per type; a Builder adds the next id. */
+  workstations?: Record<string, Array<{ workstation_id: number; tier: number }>>;
 
   // Whether the backend has connected your dashboard to the Simulation server and Confluent.
   connection_status: 'connecting' | 'connected' | 'failed';
@@ -165,6 +168,7 @@ export const EMPTY_STATE: DashboardState = {
   workstation_efficiency_ready: false,
   resource_inventory_ready: false,
   queens_orders_ready: false,
+  parts_priority_queue_ready: false,
   simulation_config: null,
   connection_status: 'connecting',
   connection_issues: [],

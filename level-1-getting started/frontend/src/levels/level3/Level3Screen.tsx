@@ -173,10 +173,10 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
             <div className="rounded-xl border border-[#E0E8F8] bg-white p-5" style={{ minHeight: 480 }}>
               <h2 className="text-[#2850B8] font-bold text-base mb-4">Worker robot assembly</h2>
               <div className="flex flex-col gap-3">
-                {ROBOTS.map(({ id, station_id, label, icon }) => {
-                  const blocked    = station_id in assembly_blocked;
-                  const inputs     = assembly_inputs[station_id] ?? {};
-                  const missingSet = blocked ? new Set(Object.keys(assembly_blocked[station_id] ?? {})) : undefined;
+                {ROBOTS.map(({ id, workstation_type, label, icon }) => {
+                  const blocked    = workstation_type in assembly_blocked;
+                  const inputs     = assembly_inputs[workstation_type] ?? {};
+                  const missingSet = blocked ? new Set(Object.keys(assembly_blocked[workstation_type] ?? {})) : undefined;
                   return (
                     <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-start gap-3">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -184,7 +184,7 @@ export const Level3Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         <span className="text-sm font-semibold text-[#031040] mr-1">{label}</span>
                         <InputChips inputs={inputs} iconMap={PART_ICON} blockedKeys={missingSet} />
                       </div>
-                      <StationHexagon tier={stationTier(station_id)} blocked={blocked}
+                      <StationHexagon tier={stationTier(workstation_type)} blocked={blocked}
                         running={running}
                         tooltip="Waiting for parts" />
                     </div>

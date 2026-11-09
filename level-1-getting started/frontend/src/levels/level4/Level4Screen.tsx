@@ -13,20 +13,19 @@ import {
   STATIONS,
   ROBOTS,
   PARTS,
-  PART_ICON,
 } from '../robots';
 
 // Set to true to show the Gatherer/Engineer/Builder buttons and the "Add station" hexagons.
 const SHOW_ORDER_BUTTONS = false;
 
-const AddStationHexagon: React.FC<{ onClick?: () => void; disabled?: boolean; size?: number }> = ({ onClick, disabled = false, size = 50 }) => {
+const AddStationHexagon: React.FC<{ onClick?: () => void; disabled?: boolean; size?: number; title?: string }> = ({ onClick, disabled = false, size = 50, title = 'Add workstation (max 4)' }) => {
   const height = Math.round(size * 1.15);
   return (
     <div
       onClick={disabled ? undefined : onClick}
       className={`relative select-none flex-none ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer group'}`}
       style={{ width: size, height }}
-      title="Add workstation (max 3)"
+      title={title}
     >
       <svg
         viewBox="0 0 100 115"
@@ -107,7 +106,6 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
     manufacturing_blocked,
     assembly_blocked,
     manufacturing_inputs,
-    assembly_inputs,
     inventory,
     events,
     robot_queue,
@@ -118,10 +116,10 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
   const level4 = useLevel4();
   const stationSlots = level4?.stationSlots ?? {};
-  const maxStations = level4?.maxStations ?? 3;
+  const maxStations = level4?.maxStations ?? 4;
   const addStation = level4?.addStation ?? (() => Promise.resolve());
   const upgradeStation = level4?.upgradeStation ?? (() => Promise.resolve());
-  const isOrderPending = level4?.isOrderPending ?? ((_station: string, _action: 'add' | 'upgrade') => false);
+  const orderBlockedReason = level4?.orderBlockedReason ?? ((_type: string, _action: 'add' | 'upgrade', _id?: number): string | null => null);
 
   return (
     <div className="flex-1 overflow-auto p-3">
@@ -129,24 +127,22 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
         {/* ── Column 1: Resource gathering ──────────────────────────────── */}
         <div className="flex-[4] flex flex-col gap-2 min-w-0">
-          {/* Inventory */}
-          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-3">
-            <h2 className="text-[#2850B8] font-bold text-sm mb-1.5">Resource inventory</h2>
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              {RESOURCES.map(({ id, label, icon }) => (
-                <InventoryItem key={id} icon={icon} label={label} qty={inventory.resource[id] ?? 0} />
-              ))}
-            </div>
-          </div>
           {/* Floor */}
           <section>
             <div className="rounded-xl border border-[#E0E8F8] bg-white p-5" style={{ minHeight: 480 }}>
-              <h2 className="text-[#2850B8] font-bold text-base mb-4">Resource gathering</h2>
+              <h2 className="text-[#2850B8] font-bold text-base mb-2">Resource gathering</h2>
+              {/* In stock */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-4 rounded-lg border border-[#E0E8F8] bg-[#EEF2FB] px-3 py-2">
+                <span className="text-sm font-bold text-[#2850B8] pr-4 border-r border-[#C9D5F0]">In stock</span>
+                {RESOURCES.map(({ id, label, icon }) => (
+                  <InventoryItem key={id} icon={icon} label={label} qty={inventory.resource[id] ?? 0} />
+                ))}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 {GATHERING_ORDER.map((gid) => {
                   const res = RESOURCES.find(r => r.id === gid)!;
                   const { id, label, icon } = res;
-                  const slots = stationSlots[id] ?? [{ id: 1, tier: 1 }];
+                  const slots = stationSlots[id] ?? [{ workstation_id: 1, tier: 1 }];
 
                   return (
                     <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-start gap-3">
@@ -168,27 +164,32 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
         <FlowDots running={running} />
 
+        {/* ── Right-hand block: the Queen's orders banner above Parts manufacturing and Worker robot assembly ── */}
+        <div className="flex-[6] flex flex-col gap-2 min-w-0">
+          {/* The Queen's open orders, with the parts each robot needs */}
+          <AssemblyQueue queue={queue} />
+
+          <div className="flex items-start gap-0 min-w-0">
+
         {/* ── Column 2: Parts manufacturing ─────────────────────────────── */}
         <div className="flex-[3] flex flex-col gap-2 min-w-0">
-          {/* Inventory */}
-          <div className="rounded-xl border border-[#E0E8F8] bg-white px-5 py-3">
-            <h2 className="text-[#2850B8] font-bold text-sm mb-1.5">Parts inventory</h2>
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              {PARTS.map(({ id, label, icon }) => (
-                <InventoryItem key={id} icon={icon} label={label} qty={inventory.part[id] ?? 0} />
-              ))}
-            </div>
-          </div>
           {/* Floor */}
           <section>
             <div className="rounded-xl border border-[#E0E8F8] bg-white p-5" style={{ minHeight: 480 }}>
-              <h2 className="text-[#2850B8] font-bold text-base mb-4">Parts manufacturing</h2>
+              <h2 className="text-[#2850B8] font-bold text-base mb-2">Parts manufacturing</h2>
+              {/* In stock */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-4 rounded-lg border border-[#E0E8F8] bg-[#EEF2FB] px-3 py-2">
+                <span className="text-sm font-bold text-[#2850B8] pr-4 border-r border-[#C9D5F0]">In stock</span>
+                {PARTS.map(({ id, label, icon }) => (
+                  <InventoryItem key={id} icon={icon} label={label} qty={inventory.part[id] ?? 0} />
+                ))}
+              </div>
               <div className="flex flex-col gap-3">
                 {STATIONS.map(({ id, label, icon, output_type }) => {
                   const blocked    = id in (manufacturing_blocked ?? {});
                   const inputs     = manufacturing_inputs[id] ?? {};
                   const missingSet = blocked ? new Set(Object.keys(manufacturing_blocked[id] ?? {})) : undefined;
-                  const slots      = stationSlots[id] ?? [{ id: 1, tier: 1 }];
+                  const slots      = stationSlots[id] ?? [{ workstation_id: 1, tier: 1 }];
 
                   return (
                     <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-start gap-3">
@@ -199,12 +200,12 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         <InputChips inputs={inputs} iconMap={RESOURCE_ICON} blockedKeys={missingSet} />
                       </div>
 
-                      {/* Stations row (up to 3) + Add button */}
+                      {/* Workstations row (up to 4) + Add button */}
                       <div className="flex items-start justify-start gap-3 flex-wrap">
                         {slots.map((st) => {
                           const isMax = st.tier >= 3;
                           return (
-                            <div key={st.id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
+                            <div key={st.workstation_id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
                               <HexagonTierBadge
                                 tier={st.tier}
                                 blocked={blocked}
@@ -216,10 +217,10 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                 <div></div>
                               ) : (
                                 <button
-                                  onClick={() => upgradeStation(id)}
-                                  title="Assign an Engineer to increase production"
-                                  disabled={isOrderPending(id, 'upgrade')}
-                                  className={actionBtnClass(!isOrderPending(id, 'upgrade'))}
+                                  onClick={() => upgradeStation(id, st.workstation_id)}
+                                  title={orderBlockedReason(id, 'upgrade', st.workstation_id) ?? 'Assign an Engineer to increase production'}
+                                  disabled={orderBlockedReason(id, 'upgrade', st.workstation_id) !== null}
+                                  className={actionBtnClass(orderBlockedReason(id, 'upgrade', st.workstation_id) === null)}
                                 >
                                   <svg width="14" height="20" viewBox="0 0 12 17" fill="none" aria-hidden="true"><path d="M6 14V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                   Engineer
@@ -233,7 +234,8 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
                               onClick={() => addStation(id)}
-                              disabled={isOrderPending(id, 'add')}
+                              disabled={orderBlockedReason(id, 'add') !== null}
+                              title={orderBlockedReason(id, 'add') ?? 'Add workstation (max 4)'}
                               size={50}
                             />
                             <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
@@ -241,9 +243,9 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                             </span>
                             <button
                               onClick={() => addStation(id)}
-                              title="Assign a Builder to add a new manufacturing station"
-                              disabled={isOrderPending(id, 'add')}
-                              className={actionBtnClass(!isOrderPending(id, 'add'))}
+                              title={orderBlockedReason(id, 'add') ?? 'Assign a Builder to add a new manufacturing station'}
+                              disabled={orderBlockedReason(id, 'add') !== null}
+                              className={actionBtnClass(orderBlockedReason(id, 'add') === null)}
                             >
                               <svg width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                               Builder
@@ -264,23 +266,18 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
 
         {/* ── Column 3: Worker robot assembly ─────────────────────────────────── */}
         <div className="flex-[3] flex flex-col gap-2 min-w-0">
-          {/* The Queen's open orders */}
-          <AssemblyQueue queue={queue} />
-
           {/* Floor */}
           <section>
             <div className="rounded-xl border border-[#E0E8F8] bg-white p-5" style={{ minHeight: 480 }}>
               <h2 className="text-[#2850B8] font-bold text-base mb-4">Worker robot assembly</h2>
               <div className="flex flex-col gap-3">
-                {ROBOTS.map(({ id, station_id, label, icon }) => {
+                {ROBOTS.map(({ id, workstation_type, label, icon }) => {
                   // Strict FIFO: only the head of the order queue is staged/built, so a station is
                   // "scheduled" only if its robot is next in the queue or already building.
-                  const scheduled   = queue[0]?.robot_type === id || !!assemblyActive[station_id];
-                  const blocked     = scheduled && station_id in (assembly_blocked ?? {});
+                  const scheduled   = queue[0]?.robot_type === id || !!assemblyActive[workstation_type];
+                  const blocked     = scheduled && workstation_type in (assembly_blocked ?? {});
                   const disabled    = !scheduled;
-                  const inputs      = assembly_inputs[station_id] ?? {};
-                  const missingSet  = blocked ? new Set(Object.keys(assembly_blocked[station_id] ?? {})) : undefined;
-                  const slots       = stationSlots[station_id] ?? [{ id: 1, tier: 1 }];
+                  const slots       = stationSlots[workstation_type] ?? [{ workstation_id: 1, tier: 1 }];
 
                   return (
                     <div key={id} className="rounded-lg border border-[#E8EFF8] bg-[#F8FAFD] p-3 flex flex-col items-start gap-3">
@@ -288,15 +285,14 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       <div className="flex items-center gap-2 flex-wrap">
                         <img src={icon} width={40} height={40} alt={label} style={{ objectFit: 'contain' }} />
                         <span className="text-sm font-semibold text-[#031040] mr-1">{label}</span>
-                        <InputChips inputs={inputs} iconMap={PART_ICON} blockedKeys={missingSet} />
                       </div>
 
-                      {/* Stations row (up to 3) + Add button */}
+                      {/* Workstations row (up to 4) + Add button */}
                       <div className="flex items-start justify-start gap-3 flex-wrap">
                         {slots.map((st) => {
                           const isMax = st.tier >= 3;
                           return (
-                            <div key={st.id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
+                            <div key={st.workstation_id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
                               <HexagonTierBadge
                                 tier={st.tier}
                                 blocked={blocked}
@@ -309,10 +305,10 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                                 <div></div>
                               ) : (
                                 <button
-                                  onClick={() => upgradeStation(station_id)}
-                                  title="Assign an Engineer to increase production"
-                                  disabled={isOrderPending(station_id, 'upgrade')}
-                                  className={actionBtnClass(!isOrderPending(station_id, 'upgrade'))}
+                                  onClick={() => upgradeStation(workstation_type, st.workstation_id)}
+                                  title={orderBlockedReason(workstation_type, 'upgrade', st.workstation_id) ?? 'Assign an Engineer to increase production'}
+                                  disabled={orderBlockedReason(workstation_type, 'upgrade', st.workstation_id) !== null}
+                                  className={actionBtnClass(orderBlockedReason(workstation_type, 'upgrade', st.workstation_id) === null)}
                                 >
                                   <svg width="14" height="20" viewBox="0 0 12 17" fill="none" aria-hidden="true"><path d="M6 14V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                   Engineer
@@ -325,18 +321,19 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                         {SHOW_ORDER_BUTTONS && slots.length < maxStations && (
                           <div className="flex flex-col items-center gap-1.5" style={{ width: 68 }}>
                             <AddStationHexagon
-                              onClick={() => addStation(station_id)}
-                              disabled={isOrderPending(station_id, 'add')}
+                              onClick={() => addStation(workstation_type)}
+                              disabled={orderBlockedReason(workstation_type, 'add') !== null}
+                              title={orderBlockedReason(workstation_type, 'add') ?? 'Add workstation (max 4)'}
                               size={50}
                             />
                             <span className="text-xs font-semibold leading-tight text-center whitespace-nowrap" style={{ color: '#57606A' }}>
                               Add station
                             </span>
                             <button
-                              onClick={() => addStation(station_id)}
-                              title="Assign a Builder to add a new assembly station"
-                              disabled={isOrderPending(station_id, 'add')}
-                              className={actionBtnClass(!isOrderPending(station_id, 'add'))}
+                              onClick={() => addStation(workstation_type)}
+                              title={orderBlockedReason(workstation_type, 'add') ?? 'Assign a Builder to add a new assembly station'}
+                              disabled={orderBlockedReason(workstation_type, 'add') !== null}
+                              className={actionBtnClass(orderBlockedReason(workstation_type, 'add') === null)}
                             >
                               <svg width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                               Builder
@@ -351,6 +348,9 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
             </div>
             <EventPanel title="Assembly events" events={events?.assembly ?? []} defaultOpen={false} />
           </section>
+        </div>
+
+          </div>
         </div>
 
       </div>

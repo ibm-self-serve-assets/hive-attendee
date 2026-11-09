@@ -25,10 +25,10 @@ export const STATIONS: { id: string; label: string; icon: string; output_type: s
   { id: 'electronics', label: 'Electronics', icon: '/icons/svg/parts_electronics.svg', output_type: 'electronics' },
 ];
 
-export const ROBOTS: { id: string; station_id: string; label: string; icon: string }[] = [
-  { id: 'gatherer',  station_id: 'gatherer', label: 'Gatherer',  icon: '/icons/svg/robot_gatherer_body.svg' },
-  { id: 'engineer', station_id: 'engineer',  label: 'Engineer', icon: '/icons/svg/robot_engineer_body.svg' },
-  { id: 'builder',  station_id: 'builder', label: 'Builder',  icon: '/icons/svg/robot_builder_body.svg' },
+export const ROBOTS: { id: string; workstation_type: string; label: string; icon: string }[] = [
+  { id: 'gatherer',  workstation_type: 'gatherer', label: 'Gatherer',  icon: '/icons/svg/robot_gatherer_body.svg' },
+  { id: 'engineer', workstation_type: 'engineer',  label: 'Engineer', icon: '/icons/svg/robot_engineer_body.svg' },
+  { id: 'builder',  workstation_type: 'builder', label: 'Builder',  icon: '/icons/svg/robot_builder_body.svg' },
 ];
 
 export const PARTS: { id: string; label: string; icon: string }[] = [

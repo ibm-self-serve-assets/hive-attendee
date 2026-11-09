@@ -6,15 +6,16 @@
 -- Workspace (see README).  The Simulation must be running and the
 -- parts-priority job must have status RUNNING before rows appear.
 --
--- Expected: up to 4 rows per run, one per part (chassis, electronics, battery,
--- actuator).  quantity_needed goes up when the Queen places an order and down
--- when assembly starts for an OPEN order.  A part with no OPEN demand has no
--- row.
+-- Expected: one row per order, the same orders as `queens_orders`, each with
+-- the parts its robot needs.  Orders of the same robot type show the same
+-- numbers.  Rows move from OPEN to IN_ASSEMBLY to ASSIGNED as the order
+-- progresses; the parts stay the same.
 --
 -- There is no ORDER BY on purpose.  This table is a live stream that keeps
--- changing, and Flink cannot sort a stream by a regular column.  Read the
--- rows from the highest quantity_needed down to get the priority.
+-- changing, and Flink cannot sort a stream by a regular column.  The dashboard
+-- sorts the OPEN rows by placed_seq: the lowest is the next robot to build.
 -- =============================================================================
 
-SELECT run_id, part_id, quantity_needed, open_orders
+SELECT run_id, placed_seq, robot_type, workstation_type, workstation_id, action, status,
+       actuator, battery, chassis, electronics
 FROM `parts_priority_queue`;

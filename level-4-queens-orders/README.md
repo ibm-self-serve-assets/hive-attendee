@@ -26,7 +26,7 @@ Your Hive Simulation includes these two topics:
 
 | Topic | Written when |
 |---|---|
-| `queen-worker-ordered` | The Queen places an order. Carries `order_id`, `robot_type`, `station`, `action`. |
+| `queen-worker-ordered` | The Queen places an order. Carries `order_id`, `robot_type`, `workstation_type`, `workstation_id`, `action`. |
 | `worker-assigned` | A robot finished assembly and was assigned. `causation_id` is the id of the `assembly-completed` event. |
 
 Note that we must also track when the Queen's orders have been processed.  The `assembly-started` topic triggers the removal of an order from the open order queue.  So your Flink SQL must process these 3 topics to track status of the Queen's order queue:
@@ -65,7 +65,7 @@ Flink gives every event a `lifecycle_stage`, groups the events by `order_id`, an
 
 ## Run the Level 4 Scripts
 
-Execute the three scripts in the [`flink/`](flink/) directory, in order, using whichever method you prefer: the **Confluent Cloud UI** (as in Level 2) or the **Confluent CLI** (as in Level 3).  The steps are the same as in those levels, only the SQL files are new.
+Execute the first three scripts in the [`flink/`](flink/) directory, in order, using whichever method you prefer: the **Confluent Cloud UI** (as in Level 2) or the **Confluent CLI** (as in Level 3).  The steps are the same as in those levels, only the SQL files are new.
 
 | Step | Script | Type | Expected status |
 |---|---|---|---|
@@ -87,7 +87,8 @@ The table has one row per order:
 |---|---|
 | `simulation_id`, `run_id`, `order_id` | The primary key. `run_id` changes when the Simulation restarts. |
 | `robot_type` | `gatherer`, `engineer` or `builder` |
-| `station` | The workstation the robot is for, e.g. `resin` |
+| `workstation_type` | The type of workstation the robot is for, e.g. `resin` |
+| `workstation_id` | The workstation of that type to upgrade (1 to 4). Empty for a Builder order: the new workstation takes the next id when it is built. |
 | `action` | `upgrade` or `add` |
 | `placed_seq` | The `event_sequence` of the order. Lower means earlier in the queue. |
 | `status` | `OPEN`, `IN_ASSEMBLY` or `ASSIGNED` |
@@ -103,7 +104,7 @@ Execute `02_run_jobs.sql` to start the continuous streaming statement.  It start
 The job applies the `lifecycle_stage` table from the overview above.  Two details are worth noticing:
 
 * **`lifecycle_stage` makes the result order-independent.** Events from different topics can reach Flink in any order.  Taking the highest `lifecycle_stage` means an order never moves backwards, even if `assembly-started` arrives before `queen-worker-ordered`.
-* **`MAX()` fills the gaps.** Only some events carry `robot_type`, `station` and `action`.  `MAX()` ignores `NULL`, so whichever event brings a value fills it in.  `placed_seq` comes only from the ordered event.
+* **`MAX()` fills the gaps.** Only some events carry `robot_type`, `workstation_type`, `workstation_id` and `action`.  `MAX()` ignores `NULL`, so whichever event brings a value fills it in.  `placed_seq` comes only from the ordered event.
 
 Orders cannot be cancelled: once the Queen places an order it stays until its robot is built and assigned.
 
@@ -116,7 +117,7 @@ The **queue** on the dashboard is the rows with `status = 'OPEN'`, sorted by `pl
 Execute the query in `03_validate.sql`, either in a new cell of the Flink SQL Workspace or at the prompt of the Flink shell (`confluent flink shell --compute-pool $POOL_ID --environment $ENV_ID --database $CLUSTER_ID`).  The Simulation should be running so you can watch the rows change.  After a delay of 5-10 seconds a table of results appears and auto-updates.
 
 You should see:
-- On a fresh run, 8 rows, all `OPEN`: the Queen's initial orders.
+- On a fresh run, 3 rows, all `OPEN`: the Queen's initial orders.
 - Rows move to `IN_ASSEMBLY` as the assembly line starts building them, then to `ASSIGNED` once the robot is built.
 - If you restarted the Simulation, earlier runs are listed too.  Each run has its own `run_id`.
 
@@ -132,15 +133,17 @@ Open your Hive Dashboard and select **Level 4.**  The queue on screen is the sam
 
 ## Explore the Level 4 Dashboard
 
-Level 4 will now be active so you can view the **Queen's orders** in the top-right of your Hive Dashboard.  The left-most icon indicates the next robot in queue to be assembled once parts are available.
+Level 4 will now be active so you can view the **Queen's orders** as a banner across the top of the Parts manufacturing and Worker robot assembly sections of your Hive Dashboard.  There is one card per open order, and the left-most card, with the gold border, is the next robot to be assembled once parts are available.
 
 <img src="screenshots/queens_orders.png"/>
 
-In the queue above for the Queen's orders, we can see:
+Each card shows:
 
-- **Next to be assembled:** Add Gatherer to a Resin workstation
-- **After that:** Engineer to upgrade the Actuator workstation
-- **And after that:** Builder to add a new Actuator workstation
+- **The robot:** Gatherer, Engineer or Builder.
+- **What it will do:** the workstation's icon with an up arrow (upgrade) or a plus sign (add a new workstation).
+- **Parts required:** the number of actuators, batteries, chassis and electronics that robot needs.  This row appears once you have completed the Parts Manufacturing Prioritization steps below.
+
+The parts you have in stock are shown under the **Parts manufacturing** heading.
 
 ---
 
@@ -148,58 +151,55 @@ In the queue above for the Queen's orders, we can see:
 
 The queue answers *what* the Hive should build next.  It raises a new question: how do we prioritize **parts manufacturing** based on the next Worker in the queue?
 
-The **Robot Assembly** stations "know" the parts they need, but they are independent of **Parts Manufacturing**.  The non-event-driven solution would be a hard-coded REST call to place orders for parts based on the next robot in the queue.  Instead, you'll use Flink to join `queens_orders` with the recipe inputs from `assembly-started` and produce a new topic that drives a **Parts Manufacturing Queue**.
-
-## Useful CLI Commands
-
-```bash
-# Short status of one statement (the plain `describe` and `list` print the whole SQL)
-confluent flink statement describe hive-queens-orders-jobs -o json | grep -E '"(name|status|status_detail)"'
-```
+The **Robot Assembly** stations "know" the parts they need, but they are independent of **Parts Manufacturing**.  The non-event-driven solution would be a hard-coded REST call to place orders for parts based on the next robot in the queue.  Instead, you'll use Flink to join `queens_orders` with the parts each robot needs, from `assembly-state`, and produce a new topic that drives a **Parts Manufacturing Queue**.
 
 ## Parts Manufacturing Prioritization
 
-The problem with isolated systems within any Organization is that they struggle to coordinate their activities.  Especially when it's a Queen isolated in the Hive's safest interior.  Execution of the Queen's orders requires tight coordination between the Part Manufacturing and Worker Assembly teams.  To achieve this, we need to extract real-time data from `assembly-started` about the parts required to manufacture each **Worker Bee**. 
+The problem with isolated systems within any Organization is that they struggle to coordinate their activities.  Especially when it's a Queen isolated in the Hive's safest interior.  Execution of the Queen's orders requires tight coordination between the Part Manufacturing and Worker Assembly teams.  To achieve this, every order in the Queen's queue needs to say which parts its **Worker Bee** is built from.
 
-From `assembly-started` for a **Gatherer Worker**:
+The Simulation publishes that recipe in `assembly-state`, one message per assembly workstation, at the start of every run.  So the recipe is known before the first robot is built.
+
+From `assembly-state` for a **Gatherer Worker**:
 ``` json
-"station_id": "gatherer",
-"output_type": "gatherer",   
-   "inputs": {
-    "chassis": 2,
-    "electronics": 1,
-    "battery": 5,
-    "actuator": 6
-}
+"workstation_type": "gatherer",
+"workstation_id": 1,
+"output_type": "gatherer",
+"parts_required": {
+  "chassis": 2,
+  "electronics": 1,
+  "battery": 5,
+  "actuator": 6
+},
+"tier": 1
 ```
 
-Pairing this with each `queens_orders` event generates a `parts_priority_queue` to guide the **Parts Manufacturing Team** in generating the most in-demand parts.  
+Pairing this with each `queens_orders` row generates a `parts_priority_queue`: the Queen's orders, each with the parts its robot needs.  The Parts Manufacturing Team reads it from the front of the queue, because the next robot to build is the one whose parts matter most.
 
 ```
-assembly-started ──► recipe per robot type ───┐
-                     (payload.inputs)         ├──► Flink JOIN + SUM per part ──► parts_priority_queue
-queens_orders ──► OPEN orders only ───────────┘                                  (upsert changelog)
+assembly-state ──► recipe per robot type ───┐
+                   (payload.parts_required)  ├──► Flink JOIN ──► parts_priority_queue
+queens_orders ──► every order ──────────────┘                   (upsert changelog)
 ```
 
 ### How the Priority Is Computed
 
-1. **Identify required parts.** Each `assembly-started` event lists the parts its robot consumed.  Flink keeps one recipe per robot type (`gatherer`, `engineer`, `builder`) and reads each part by name, as in Level 3.
-2. **Determine demand.** Only `queens_orders` rows with `status = 'OPEN'` count.  An order that is `IN_ASSEMBLY` has already taken its parts.
-3. **Join and sum.** Each OPEN order is joined to the recipe of its `robot_type`, and the parts are summed per part.  The part with the highest `quantity_needed` is the most in-demand.
+1. **Identify required parts.** Each `assembly-state` message lists the parts its robot consumes.  Flink keeps one recipe per robot type (`gatherer`, `engineer`, `builder`) and reads each part by name, as in Level 3.  The recipe never changes, so `MAX()` is safe even though the topic can hold several messages for one robot type (at the start of a run, and again after each upgrade).
+2. **Join.** Each order in `queens_orders` is joined to the recipe of its `robot_type`.  Nothing is summed and nothing is filtered, so there is one row per order.
+3. **Read the queue.** The rows with `status = 'OPEN'`, sorted by `placed_seq`, are the Queen's queue.  The first row is the next robot to build, so its parts are the ones that matter most.
 
-For example, if the Queen's open orders are one Gatherer, one Engineer and one Builder, the recipes combine like this:
+With the Simulation's starting rules, the recipes are:
 
-| Part | Gatherer | Engineer | Builder | `quantity_needed` | Priority |
-|---|---|---|---|---|---|
-| `actuator` | 6 | 8 | 10 | **24** | 1 |
-| `battery` | 5 | 2 | 4 | **11** | 2 |
-| `chassis` | 2 | 1 | 3 | **6** | 3 |
-| `electronics` | 1 | 3 | 2 | **6** | 3 |
+| `robot_type` | `actuator` | `battery` | `chassis` | `electronics` |
+|---|---|---|---|---|
+| `gatherer` | 6 | 5 | 2 | 1 |
+| `engineer` | 8 | 2 | 1 | 3 |
+| `builder` | 10 | 4 | 3 | 2 |
 
-When assembly starts for the Gatherer, its order is no longer OPEN, so Flink updates each row: `actuator` falls to 18, and so on.  When no OPEN order needs a part, its row is deleted.
+So if the Queen's open orders are one Gatherer, one Engineer and one Builder, in that order, `parts_priority_queue` holds three rows, one per order, each carrying the numbers on its own line above.
 
-> **Recipe appears after the first build:** a robot type only gets a recipe once its first `assembly-started` event has been seen, so until then its OPEN orders add no demand.  The table fills in as each robot type is first built.
+When assembly starts for the Gatherer, its row changes to `IN_ASSEMBLY`.  The parts stay on the row.
 
+> **How the order of the queue is used:** this level only shows the parts on each order.  Deciding which part to manufacture next is a separate function, not covered here.
 
 ### Run Scripts
 
@@ -221,13 +221,13 @@ Run the three new scripts in the [`flink/`](flink/) directory, in order, using w
 
 `04_create_priority_sink.sql` creates the `parts_priority_queue` table in Flink and its backing Kafka topic, with upsert changelog mode.  It is a DDL statement, so it runs once and finishes with status `COMPLETED`.
 
-The table has one row per part:
+The table has one row per order: every column of `queens_orders`, plus the parts the order's robot needs:
 
 | Column | Meaning |
 |---|---|
-| `simulation_id`, `run_id`, `part_id` | The primary key. `part_id` is `chassis`, `electronics`, `battery` or `actuator`. |
-| `quantity_needed` | Units of the part needed by all OPEN orders. Higher means more urgent. |
-| `open_orders` | How many OPEN orders need the part. |
+| `simulation_id`, `run_id`, `order_id` | The primary key, as in `queens_orders`. |
+| `robot_type`, `workstation_type`, `workstation_id`, `action`, `placed_seq`, `status` | Copied from `queens_orders`. |
+| `actuator`, `battery`, `chassis`, `electronics` | Units of each part one robot of this type needs. Empty if the recipe does not use the part. |
 
 **Using the UI**
 1. Open [`flink/04_create_priority_sink.sql`](flink/04_create_priority_sink.sql), copy the entire contents and paste them into the **first workspace cell**.
@@ -250,7 +250,7 @@ The `> /dev/null` hides the CLI's echo of the whole SQL file; errors are still s
 
 ### Step 5 — Start the Priority Job
 
-`05_run_priority_job.sql` starts the continuous statement that joins the OPEN orders in `queens_orders` with the robot recipes from `assembly-started`, and keeps `parts_priority_queue` up to date.  It starts as `PENDING` and can take a minute or two to reach `RUNNING`.  Do not continue until it is `RUNNING`, and leave it running.
+`05_run_priority_job.sql` starts the continuous statement that joins every order in `queens_orders` with the robot recipes from `assembly-state`, and keeps `parts_priority_queue` up to date.  It starts as `PENDING` and can take a minute or two to reach `RUNNING`.  Do not continue until it is `RUNNING`, and leave it running.
 
 **Using the UI**
 1. Open [`flink/05_run_priority_job.sql`](flink/05_run_priority_job.sql), copy the entire contents and paste them into the **second workspace cell**.
@@ -269,6 +269,8 @@ confluent flink statement create hive-parts-priority-jobs \
 confluent flink statement describe hive-parts-priority-jobs -o json | grep -E '"(status|status_detail)"'
 ```
 This command may take a few seconds to return.  Repeat the `describe` command until it shows `RUNNING`.
+
+> **Expected warnings:** The Confluent Cloud UI may show 3 warnings on this statement: `STATE_INTENSIVE_AGG_FUNCTION`, `UPSERT_AND_PRIMARY_KEYS_DIFFERENT` and `HIGH_STATE_OPERATOR_WITHOUT_TTL`.  They are expected and the job still runs.  They come from the `MAX()` over the recipes and from joining `queens_orders` with them.  The state is tiny here: three recipes and one row per order.  Do **not** set a time-to-live: the recipe is written once at the start of a run, and if it expired, later orders would get no parts.
 
 > **Gate Check:** Both `hive-queens-orders-jobs` (Step 2) and `hive-parts-priority-jobs` (Step 5) must be `RUNNING` before you continue.
 
@@ -296,20 +298,23 @@ confluent flink shell \
 At the `>` prompt, paste the query from `flink/06_validate_priority.sql` and press **Enter**.  The shell may show a typeahead hint; ignore it.  You will see `statement phase pending`, then a table opens after 5-10 seconds and auto-updates.  When you have verified the results, press `Q` to close the table, then type `EXIT;` or press `Ctrl+D` to leave the shell.
 
 **What you should see**
-- Up to 4 rows per run: `chassis`, `electronics`, `battery` and `actuator`.  Flink cannot sort a live stream, so read down from the highest `quantity_needed` to get the priority.
-- `actuator` and `battery` near the top while the Queen has Engineer or Builder orders open, because those recipes need the most units.
-- `quantity_needed` rising when the Queen places an order, and falling when assembly starts for an OPEN order.
+- One row per order, the same orders as in `queens_orders`, each with `actuator`, `battery`, `chassis` and `electronics` filled in.
+- Orders of the same robot type show the same numbers (see the recipe table above).
+- Rows move from `OPEN` to `IN_ASSEMBLY` to `ASSIGNED` as the order progresses.  The parts do not change.
 - Earlier runs listed too if you restarted the Simulation.  Each run has its own `run_id`.
-- If no rows appear after a couple of minutes, check that the Simulation timer is incrementing and that both jobs are `RUNNING`.  Remember that a robot type has no recipe until its first `assembly-started` event.
+- If no rows appear after a couple of minutes, check that the Simulation timer is incrementing and that both jobs are `RUNNING`.
 
-**Congratulations! Your Parts Manufacturing Team now has a `parts_priority_queue`!**  The next level builds on this topic.
+Now open your Hive Dashboard and select **Level 4**.  The order cards show a **Parts required** row.
+
+**Congratulations! Your Parts Manufacturing Team now has a `parts_priority_queue`!**
 
 ---
 
 ### Useful CLI Commands
 
 ```bash
-# Short status of the priority statements
+# Short status of one statement (the plain `describe` and `list` print the whole SQL)
+confluent flink statement describe hive-queens-orders-jobs -o json | grep -E '"(name|status|status_detail)"'
 confluent flink statement describe hive-parts-priority-jobs -o json | grep -E '"(name|status|status_detail)"'
 
 # Stop a statement (use only if you need to restart).

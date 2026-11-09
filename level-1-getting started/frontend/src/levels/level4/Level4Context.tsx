@@ -8,20 +8,22 @@ const FALLBACK_INITIAL_TIERS: Record<string, number> = {
   engineer: 1, gatherer: 1,
 };
 
-const MAX_STATIONS = 3;
+// A workstation type has up to 4 workstations, each with its own tier (1 to 3).
+const MAX_WORKSTATIONS = 4;
+const MAX_TIER = 3;
 
 // ── Derived helpers from simulation_config (or fallback) ──────────────────────
 
 function initialTiers(cfg: SimulationConfig | null): Record<string, number> {
   if (!cfg) return FALLBACK_INITIAL_TIERS;
-  return cfg.station_initial_tiers;
+  return cfg.workstation_initial_tiers;
 }
 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface StationSlot {
-  id: number;
+  workstation_id: number;
   tier: number;
 }
 
@@ -29,16 +31,17 @@ interface Level4ContextValue {
   stationSlots: Record<string, StationSlot[]>;
   maxStations: number;
   configReady: boolean;
-  /** Order a Builder robot to add a station to `key`. */
-  addStation: (key: string) => Promise<void>;
-  /** Order a Gatherer (gathering station) or Engineer (any other station) to upgrade `key`. */
-  upgradeStation: (key: string) => Promise<void>;
-  orderRobot: (robotType: RobotType, station: string) => Promise<void>;
+  /** Order a Builder robot to add a workstation to the type `workstationType`. */
+  addStation: (workstationType: string) => Promise<void>;
+  /** Order a Gatherer (gathering) or Engineer (any other type) to upgrade one workstation. */
+  upgradeStation: (workstationType: string, workstationId: number) => Promise<void>;
+  orderRobot: (robotType: RobotType, workstationType: string, workstationId?: number) => Promise<void>;
   /**
-   * True while an order for this `action` on `station` is active: just sent, waiting in the
-   * Queen's queue, or under assembly. The matching button is disabled meanwhile.
+   * Why an order cannot be sent right now, in plain words, or null when it can.
+   * An upgrade is per workstation (pass its `workstationId`); an add is per type.
+   * The matching button is disabled, with this text as its tooltip.
    */
-  isOrderPending: (station: string, action: OrderAction) => boolean;
+  orderBlockedReason: (workstationType: string, action: OrderAction, workstationId?: number) => string | null;
 }
 
 type RobotType = 'gatherer' | 'engineer' | 'builder';
@@ -47,7 +50,9 @@ type OrderAction = 'add' | 'upgrade';
 /** A click is remembered this long if the order never shows up in queens_orders. */
 const SUBMITTED_TTL_MS = 20000;
 
-const orderKey = (station: string, action: OrderAction) => `${station}:${action}`;
+/** `<type>:<id>:upgrade` for one workstation, `<type>:add` for a Builder (per type). */
+const orderKey = (workstationType: string, action: OrderAction, workstationId?: number | null) =>
+  action === 'add' ? `${workstationType}:add` : `${workstationType}:${workstationId}:upgrade`;
 
 const GATHERING_STATIONS = new Set(['copper', 'energy', 'metals', 'resin', 'silicon']);
 
@@ -56,28 +61,28 @@ const Level4Context = createContext<Level4ContextValue | null>(null);
 export const Level4Provider: React.FC<{ state: DashboardState; children: React.ReactNode }> = ({ state, children }) => {
   const cfg = state.simulation_config;
 
-  // Use live station_slots from the backend (populated by *.upgraded / *.added events).
+  // Use the live workstations from the backend (built from the *.state events).
   // Falls back to initial tiers from simulation_config when the backend has not yet sent slot data.
   const stationSlots = useMemo<Record<string, StationSlot[]>>(() => {
-    if (state.station_slots && Object.keys(state.station_slots).length > 0) {
-      return state.station_slots;
+    if (state.workstations && Object.keys(state.workstations).length > 0) {
+      return state.workstations;
     }
-    // Fallback: one slot per station at initial tier.
+    // Fallback: workstation 1 of each type at its initial tier.
     const tiers = initialTiers(cfg);
     return Object.fromEntries(
-      Object.entries(tiers).map(([stationId, tier]) => [
-        stationId,
-        [{ id: 1, tier }],
+      Object.entries(tiers).map(([workstationType, tier]) => [
+        workstationType,
+        [{ workstation_id: 1, tier }],
       ])
     );
-  }, [state.station_slots, cfg]);
+  }, [state.workstations, cfg]);
 
   const configReady = cfg !== null;
 
-  // Orders that are in the Queen's queue or under assembly, by "station:action".
+  // Orders that are in the Queen's queue or under assembly, by order key.
   const activeKeys = useMemo(() => {
     const active = [...(state.robot_queue ?? []), ...(state.orders_in_assembly ?? [])];
-    return new Set(active.map((o) => orderKey(o.station, o.action)));
+    return new Set(active.map((o) => orderKey(o.workstation_type, o.action, o.workstation_id)));
   }, [state.robot_queue, state.orders_in_assembly]);
 
   // Orders just sent that have not reached queens_orders yet (Flink adds a short delay),
@@ -112,15 +117,19 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
     return () => clearTimeout(timer);
   }, [submitted]);
 
-  const orderRobot = async (robotType: RobotType, station: string) => {
+  const orderRobot = async (robotType: RobotType, workstationType: string, workstationId?: number) => {
     const action: OrderAction = robotType === 'builder' ? 'add' : 'upgrade';
-    const key = orderKey(station, action);
+    const key = orderKey(workstationType, action, workstationId);
     setSubmitted((prev) => ({ ...prev, [key]: Date.now() }));
     try {
       const r = await fetch('/api/order-worker-beee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ robot_type: robotType, station }),
+        body: JSON.stringify({
+          robot_type: robotType,
+          workstation_type: workstationType,
+          ...(action === 'upgrade' ? { workstation_id: workstationId } : {}),
+        }),
       });
       if (!r.ok) {
         console.error('Queen rejected the order:', await r.text());
@@ -133,26 +142,45 @@ export const Level4Provider: React.FC<{ state: DashboardState; children: React.R
   };
 
   // The order shows up in the queue when Flink writes it to queens_orders, not here.
-  const addStation = (key: string) => orderRobot('builder', key);
+  const addStation = (workstationType: string) => orderRobot('builder', workstationType);
 
-  const upgradeStation = (key: string) =>
-    orderRobot(GATHERING_STATIONS.has(key) ? 'gatherer' : 'engineer', key);
+  const upgradeStation = (workstationType: string, workstationId: number) =>
+    orderRobot(GATHERING_STATIONS.has(workstationType) ? 'gatherer' : 'engineer', workstationType, workstationId);
 
-  const isOrderPending = (station: string, action: OrderAction) => {
-    const key = orderKey(station, action);
+  // One order per workstation (upgrade) or per type (add) at a time. This also keeps the
+  // pending orders from passing tier 3 (E5) or 4 workstations (E6), and stops a double click (E7).
+  const isOrderPending = (workstationType: string, action: OrderAction, workstationId?: number) => {
+    const key = orderKey(workstationType, action, workstationId);
     return activeKeys.has(key) || key in submitted;
+  };
+
+  const orderBlockedReason = (workstationType: string, action: OrderAction, workstationId?: number): string | null => {
+    if (state.connection_status !== 'connected') return 'Not connected to the Simulation server';
+    if (state.lifecycle_status === 'stopped') return 'The Simulation is stopped';
+    if (state.lifecycle_status === 'expired') return 'The Simulation has expired';
+
+    const slots = stationSlots[workstationType] ?? [];
+    if (action === 'add') {
+      if (slots.length >= MAX_WORKSTATIONS) return `Already ${MAX_WORKSTATIONS} workstations`;
+    } else {
+      const slot = slots.find((s) => s.workstation_id === workstationId);
+      if (!slot) return 'This workstation does not exist yet';
+      if (slot.tier >= MAX_TIER) return `Already at the highest tier (${MAX_TIER})`;
+    }
+    if (isOrderPending(workstationType, action, workstationId)) return 'An order for this is already waiting';
+    return null;
   };
 
   return (
     <Level4Context.Provider
       value={{
         stationSlots,
-        maxStations: MAX_STATIONS,
+        maxStations: MAX_WORKSTATIONS,
         configReady,
         addStation,
         upgradeStation,
         orderRobot,
-        isOrderPending,
+        orderBlockedReason,
       }}
     >
       {children}

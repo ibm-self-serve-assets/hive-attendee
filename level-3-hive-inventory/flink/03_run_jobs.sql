@@ -25,7 +25,7 @@ BEGIN
 
 -- ============================================================================
 -- JOB 1: Resource inventory
---   Inflows  : gathering-completed  (payload.station_id, payload.quantity)
+--   Inflows  : gathering-completed  (payload.workstation_type, payload.quantity)
 --   Outflows : manufacturing-started (payload.inputs.{energy,resin,metals,copper,silicon})
 -- ============================================================================
 INSERT INTO `resource_inventory`
@@ -40,10 +40,10 @@ FROM (
   SELECT
     simulation_id,
     run_id,
-    payload.station_id AS resource_id,
+    payload.workstation_type AS resource_id,
     CAST(payload.quantity AS BIGINT) AS delta
   FROM `gathering-completed`
-  WHERE payload.station_id IS NOT NULL
+  WHERE payload.workstation_type IS NOT NULL
 
   UNION ALL
 

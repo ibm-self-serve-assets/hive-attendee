@@ -314,6 +314,10 @@ class QueensOrdersWatcher:
     Only checks that the topic exists; it never reads records.
     """
 
+    # Which store flag this watcher keeps, and how it reads in the log; the parts watcher overrides them.
+    ready_attr = "queens_orders_ready"
+    level_label = "Level 4"
+
     def __init__(
         self,
         store: DashboardStore,
@@ -359,22 +363,44 @@ class QueensOrdersWatcher:
         while True:
             try:
                 ready = await asyncio.to_thread(self._topic_exists)
-                if ready != self.store.queens_orders_ready:
-                    self.store.queens_orders_ready = ready
-                    logger.info(
-                        f"Level 4 unlocked: Topic {self.topic} exists" if ready
-                        else f"Level 4 locked: Topic {self.topic} is missing",
-                        extra=MAJOR,
-                    )
+                if ready != getattr(self.store, self.ready_attr):
+                    setattr(self.store, self.ready_attr, ready)
+                    logger.info(self._status_message(ready), extra=MAJOR)
                     await self.on_change()
                 if ready and was_ready is False and self.on_unlocked:
-                    await self.on_unlocked("Level 4")
+                    await self.on_unlocked(self.level_label)
                 was_ready = ready
             except asyncio.CancelledError:
                 return
             except Exception as e:
                 logger.debug(f"Queens orders topic check failed: {e}")
             await asyncio.sleep(POLL_SECONDS)
+
+    def _status_message(self, ready: bool) -> str:
+        return (
+            f"Level 4 unlocked: Topic {self.topic} exists" if ready
+            else f"Level 4 locked: Topic {self.topic} is missing"
+        )
+
+
+class PartsPriorityQueueWatcher(QueensOrdersWatcher):
+    """
+    Keeps `store.parts_priority_queue_ready` current: the `parts_priority_queue` topic exists
+    (Flink creates it when the attendee runs 04_create_priority_sink.sql). It only decides whether
+    the order cards can show their "Parts required" row, so it never restarts the Simulation.
+    """
+
+    ready_attr = "parts_priority_queue_ready"
+
+    def __init__(self, *args, topic: str = "parts_priority_queue", **kwargs):
+        kwargs.pop("on_unlocked", None)
+        super().__init__(*args, topic=topic, **kwargs)
+
+    def _status_message(self, ready: bool) -> str:
+        return (
+            f"Parts priority queue found: Topic {self.topic} exists" if ready
+            else f"Parts priority queue missing: Topic {self.topic} not found"
+        )
 
 
 SCHEMA_POLL_SECONDS = 5.0

@@ -192,10 +192,10 @@ class EventConsumerManager:
 class CalculatedValuesConsumer:
     """
     Consumes records from the `workstation_efficiency` topic (written by the attendee's Flink SQL)
-    and updates `store.job_durations` with the latest elapsed_sim_minutes per station_id.
+    and updates `store.job_durations` with the latest elapsed_sim_minutes per workstation_type.
 
     The topic uses json-registry format; the value is a flat JSON object with the columns
-    defined in 01_create_sink.sql.  We only need `station_id` and `elapsed_sim_minutes`.
+    defined in 01_create_sink.sql.  We only need `workstation_type` and `elapsed_sim_minutes`.
     """
 
     def __init__(
@@ -258,7 +258,7 @@ class CalculatedValuesConsumer:
             "enable.auto.commit": True,
             # Flink writes this topic in Kafka transactions that commit at each checkpoint
             # (about once a minute).  Read uncommitted records so the UI does not wait for
-            # the commit; the store only keeps the latest value per station_id.
+            # the commit; the store only keeps the latest value per workstation_type.
             "isolation.level": "read_uncommitted",
         }
         self._kafka_consumer = ConfluentConsumer(conf, logger=kafka_logger)
@@ -285,14 +285,14 @@ class CalculatedValuesConsumer:
                     if len(payload) > 5 and payload[0] == 0x00:
                         payload = payload[5:]
                     data = json.loads(payload.decode("utf-8"))
-                    station_id = data.get("station_id")
+                    workstation_type = data.get("workstation_type")
                     elapsed = data.get("elapsed_sim_minutes")
-                    if station_id and elapsed is not None:
-                        changed = self.store.ingest_calculated_value(str(station_id), int(elapsed))
+                    if workstation_type and elapsed is not None:
+                        changed = self.store.ingest_calculated_value(str(workstation_type), int(elapsed))
                         if changed and self.on_change:
                             await self.on_change()
                     else:
-                        logger.debug(f"workstation_efficiency record missing station_id/elapsed: {data}")
+                        logger.debug(f"workstation_efficiency record missing workstation_type/elapsed: {data}")
                 except Exception as parse_err:
                     logger.warning(f"Skipping malformed workstation_efficiency record: {parse_err}")
                     continue
@@ -443,9 +443,13 @@ class QueensOrdersConsumer:
 
     The topic uses json-registry upsert format: Flink writes the table's primary key
     (simulation_id, run_id, order_id) to the Kafka message *key* and the remaining
-    columns (robot_type, station, action, placed_seq, status) to the value, so both
+    columns (robot_type, workstation_type, workstation_id, action, placed_seq, status) to the value, so both
     must be read.
     """
+
+    # Used in the Kafka group id and in log messages; the parts consumer overrides them.
+    group_prefix = "ord"
+    name = "QueensOrders"
 
     def __init__(
         self,
@@ -472,7 +476,7 @@ class QueensOrdersConsumer:
             return
         self._running = True
         self._task = asyncio.create_task(self._run())
-        logger.info("QueensOrders consumer started.", extra=MAJOR)
+        logger.info(f"{self.name} consumer started.", extra=MAJOR)
 
     def stop(self) -> None:
         self._running = False
@@ -485,15 +489,28 @@ class QueensOrdersConsumer:
             except Exception:
                 pass
             self._kafka_consumer = None
-        logger.info("QueensOrders consumer stopped.", extra=MAJOR)
+        logger.info(f"{self.name} consumer stopped.", extra=MAJOR)
+
+    def _ingest(self, run_id: str, order_id: str, value: dict) -> bool:
+        """Store one row of the topic. Returns True if the current run's screen changed."""
+        order = {
+            "order_id": order_id,
+            "robot_type": value.get("robot_type"),
+            "workstation_type": value.get("workstation_type"),
+            "workstation_id": value.get("workstation_id"),
+            "action": value.get("action"),
+            "placed_seq": value.get("placed_seq"),
+            "status": value.get("status"),
+        }
+        return self.store.ingest_queens_order(run_id, order)
 
     async def _run(self) -> None:
         if not (KAFKA_AVAILABLE and self.bootstrap_servers and self.api_key and self.api_secret):
-            logger.info("QueensOrders consumer not started: missing credentials.")
+            logger.info(f"{self.name} consumer not started: missing credentials.")
             return
 
-        group_id = _make_group_id("ord", self.store)
-        logger.info(f"QueensOrders consumer group: {group_id}, topic: {self.topic}")
+        group_id = _make_group_id(self.group_prefix, self.store)
+        logger.info(f"{self.name} consumer group: {group_id}, topic: {self.topic}")
 
         conf = {
             "bootstrap.servers": self.bootstrap_servers,
@@ -524,7 +541,7 @@ class QueensOrdersConsumer:
                 if msg is None:
                     continue
                 if msg.error():
-                    logger.debug(f"QueensOrders Kafka error: {msg.error()}")
+                    logger.debug(f"{self.name} Kafka error: {msg.error()}")
                     continue
 
                 try:
@@ -537,26 +554,34 @@ class QueensOrdersConsumer:
                     run_id = key.get("run_id")
                     order_id = key.get("order_id")
                     if run_id and order_id:
-                        order = {
-                            "order_id": str(order_id),
-                            "robot_type": value.get("robot_type"),
-                            "station": value.get("station"),
-                            "action": value.get("action"),
-                            "placed_seq": value.get("placed_seq"),
-                            "status": value.get("status"),
-                        }
-                        changed = self.store.ingest_queens_order(str(run_id), order)
+                        changed = self._ingest(str(run_id), str(order_id), value)
                         if changed and self.on_change:
                             await self.on_change()
                     else:
-                        logger.debug(f"queens_orders record missing fields: {key} {value}")
+                        logger.debug(f"{self.topic} record missing fields: {key} {value}")
                 except Exception as parse_err:
-                    logger.warning(f"Skipping malformed queens_orders record: {parse_err}")
+                    logger.warning(f"Skipping malformed {self.topic} record: {parse_err}")
                     continue
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"QueensOrders consumer error: {e}")
+                logger.error(f"{self.name} consumer error: {e}")
                 await asyncio.sleep(0.5)
 
+
+class PartsPriorityQueueConsumer(QueensOrdersConsumer):
+    """
+    Consumes the `parts_priority_queue` topic (Level 4 Flink SQL, steps 4 to 6): the Queen's
+    orders with the parts each robot needs. Same key and value layout as `queens_orders`; only
+    the parts are kept, in `store.parts_by_run`, so the order cards can show "Parts required".
+    """
+
+    group_prefix = "prt"
+    name = "PartsPriorityQueue"
+
+    def __init__(self, *args, topic: str = "parts_priority_queue", **kwargs):
+        super().__init__(*args, topic=topic, **kwargs)
+
+    def _ingest(self, run_id: str, order_id: str, value: dict) -> bool:
+        return self.store.ingest_order_parts(run_id, order_id, value)

@@ -55,7 +55,7 @@ Flink will create a Kafka topic named `workstation_efficiency` and publish a uni
 |---|---|---|
 | `job_id` | Shared `payload.job_id` | Correlates both events together |
 | `stage` | `gathering`, `manufacturing`, or `assembly` | Allows cross-stage filtering and grouping |
-| `output_type` | `station_id` | Identifies which workstation or item type was worked on |
+| `output_type` | `workstation_type` | Identifies which workstation or item type was worked on |
 | `elapsed_sim_minutes` | `completed.sim_time_minutes - started.sim_time_minutes` | **Exact simulated duration.** Independent of clock drift or Simulation speed. |
 | `elapsed_wall_s` | Difference between `occurred_at` timestamps | **Real-world duration in seconds.** Measures real wall-clock latency. |
 

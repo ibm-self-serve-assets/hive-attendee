@@ -231,13 +231,13 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
           >
             <h2 className="text-[#2850B8] font-bold text-base mb-4">Assemble workers</h2>
             <div className="flex flex-col gap-3">
-              {ROBOTS.map(({ id, station_id, label, icon }) => {
+              {ROBOTS.map(({ id, workstation_type, label, icon }) => {
                 const count   = assembly_completed[id] ?? 0;
-                const blocked = station_id in assembly_blocked;
-                const dur     = job_durations[station_id] ?? job_durations[id];
-                const inputs  = assembly_inputs[station_id] ?? {};
+                const blocked = workstation_type in assembly_blocked;
+                const dur     = job_durations[workstation_type] ?? job_durations[id];
+                const inputs  = assembly_inputs[workstation_type] ?? {};
                 const missingSet = blocked
-                  ? new Set(Object.keys(assembly_blocked[station_id] ?? {}))
+                  ? new Set(Object.keys(assembly_blocked[workstation_type] ?? {}))
                   : undefined;
 
                 return (

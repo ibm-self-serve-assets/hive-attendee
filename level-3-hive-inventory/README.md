@@ -252,7 +252,7 @@ Press `Q` to close the results. Then type `EXIT;` or press `Ctrl+D` to close the
 ### Resources (`resource_inventory`)
 ```
 resources[resource_id] =
-    SUM(gathering-completed.payload.quantity   WHERE station_id = resource_id)
+    SUM(gathering-completed.payload.quantity   WHERE workstation_type = resource_id)
   − SUM(manufacturing-started.payload.inputs[resource_id])
 ```
 Resources are delivered by gathering jobs and consumed when manufacturing stations start.

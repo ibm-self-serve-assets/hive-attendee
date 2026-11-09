@@ -12,6 +12,9 @@ at registration time and will reject your request if any are missing.
 State topics (compact policy, infinite retention):
 simulation-state             — Simulation lifecycle snapshot (lifecycle status, errors)
 simulation-initialized       — Simulation configuration, written once per run
+gathering-state              — Tier of each gathering workstation (one message per workstation)
+manufacturing-state          — Tier, output and resources of each manufacturing workstation
+assembly-state               — Tier, output and parts of each assembly workstation
 
 WHY COMPACT FOR SIMULATION-STATE?
   Log compaction keeps only the most recent message per key. This means your
@@ -90,8 +93,8 @@ STATE_CONFIG = {
 def _load_topics(server_url: str, token: str, attendee_id: str) -> List[Tuple[str, dict]]:
     """
     The event topics, as published by the Simulation server (GET /v1/schemas).
-    ``simulation-state`` and ``simulation-initialized`` get the compact/infinite-retention
-    policy; all others get the delete/24 h policy.
+    ``simulation-state``, ``simulation-initialized`` and the three workstation ``*-state`` topics
+    get the compact/infinite-retention policy; all others get the delete/24 h policy.
     """
     return [
         (name, STATE_CONFIG if kind == "state" else ACTIVITY_CONFIG)

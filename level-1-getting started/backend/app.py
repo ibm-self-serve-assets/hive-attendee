@@ -18,9 +18,11 @@ from backend.log_setup import LOG_FILE, MAJOR
 from backend.store import DashboardStore
 from backend.consumer import (
     EventConsumerManager, CalculatedValuesConsumer, InventoryBalancesConsumer, QueensOrdersConsumer,
+    PartsPriorityQueueConsumer,
 )
 from backend.topic_watch import (
-    CalculatedValuesWatcher, InventoryBalancesWatcher, QueensOrdersWatcher, EventTopicsWatcher, SchemaWatcher,
+    CalculatedValuesWatcher, InventoryBalancesWatcher, QueensOrdersWatcher, PartsPriorityQueueWatcher,
+    EventTopicsWatcher, SchemaWatcher,
     fetch_event_topic_names, fetch_published_schemas, fetch_registered_schema,
 )
 
@@ -36,6 +38,8 @@ hive_inventory_balances_watcher: Optional[InventoryBalancesWatcher] = None
 hive_inventory_balances_consumer: Optional[InventoryBalancesConsumer] = None
 hive_queens_orders_watcher: Optional[QueensOrdersWatcher] = None
 hive_queens_orders_consumer: Optional[QueensOrdersConsumer] = None
+hive_parts_priority_watcher: Optional[PartsPriorityQueueWatcher] = None
+hive_parts_priority_consumer: Optional[PartsPriorityQueueConsumer] = None
 schema_watcher: Optional[SchemaWatcher] = None
 subscribers: List[asyncio.Queue] = []
 
@@ -70,7 +74,8 @@ async def lifespan(app: FastAPI):
     global consumer_mgr, event_topics_watcher, schema_watcher, \
         hive_job_durations_watcher, hive_job_durations_consumer, \
         hive_inventory_balances_watcher, hive_inventory_balances_consumer, \
-        hive_queens_orders_watcher, hive_queens_orders_consumer
+        hive_queens_orders_watcher, hive_queens_orders_consumer, \
+        hive_parts_priority_watcher, hive_parts_priority_consumer
     store.attendee_id = config.attendee_id
     logger.info(
         f"Console shows only major events and errors. Full logs: {LOG_FILE}",
@@ -181,6 +186,24 @@ async def lifespan(app: FastAPI):
     )
     hive_queens_orders_consumer.start()
 
+    hive_parts_priority_watcher = PartsPriorityQueueWatcher(
+        store=store,
+        bootstrap_servers=config.confluent_bootstrap_server,
+        api_key=config.confluent_api_key,
+        api_secret=config.confluent_api_secret,
+        on_change=_notify_state,
+    )
+    hive_parts_priority_watcher.start()
+
+    hive_parts_priority_consumer = PartsPriorityQueueConsumer(
+        store=store,
+        bootstrap_servers=config.confluent_bootstrap_server,
+        api_key=config.confluent_api_key,
+        api_secret=config.confluent_api_secret,
+        on_change=_notify_state,
+    )
+    hive_parts_priority_consumer.start()
+
     asyncio.create_task(auto_connect())
     yield
     event_topics_watcher.stop()
@@ -198,6 +221,10 @@ async def lifespan(app: FastAPI):
         hive_queens_orders_watcher.stop()
     if hive_queens_orders_consumer:
         hive_queens_orders_consumer.stop()
+    if hive_parts_priority_watcher:
+        hive_parts_priority_watcher.stop()
+    if hive_parts_priority_consumer:
+        hive_parts_priority_consumer.stop()
     if consumer_mgr:
         consumer_mgr.stop()
 
@@ -537,7 +564,8 @@ class ControlCommandRequest(BaseModel):
 
 class OrderRobotRequest(BaseModel):
     robot_type: str
-    station: str
+    workstation_type: str
+    workstation_id: Optional[int] = None  # the workstation to upgrade; omit for a Builder order
 
 
 @app.get("/api/config")
@@ -692,7 +720,9 @@ def _raise_for_server_error(r: httpx.Response) -> None:
 async def order_robot(req: OrderRobotRequest):
     _require_connection()
     cmd_url = f"{config.simulation_server_url}/v1/simulations/{store.active_simulation_id}/order-worker-beee"
-    body: Dict[str, Any] = {"robot_type": req.robot_type, "station": req.station}
+    body: Dict[str, Any] = {"robot_type": req.robot_type, "workstation_type": req.workstation_type}
+    if req.workstation_id is not None:
+        body["workstation_id"] = req.workstation_id
     if store.run_generation > 0:
         body["expected_generation"] = store.run_generation
 
@@ -701,7 +731,7 @@ async def order_robot(req: OrderRobotRequest):
         _raise_for_server_error(r)
         receipt = r.json()
         logger.info(
-            f"Queen: ordered '{req.robot_type}' for '{req.station}' -> order_id={receipt.get('order_id')}",
+            f"Queen: ordered '{req.robot_type}' for '{req.workstation_type}' {req.workstation_id or ''} -> order_id={receipt.get('order_id')}",
             extra=MAJOR,
         )
         return receipt

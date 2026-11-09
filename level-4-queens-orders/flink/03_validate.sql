@@ -6,7 +6,7 @@
 -- The Simulation must be running and the queens-orders job must have
 -- status RUNNING before rows appear.
 --
--- Expected on a fresh run: 8 rows, all OPEN, matching the Queen's initial
+-- Expected on a fresh run: 3 rows, all OPEN, matching the Queen's initial
 -- orders.  Rows move to IN_ASSEMBLY as assembly starts, then to ASSIGNED when
 -- the robot is built.
 --
@@ -16,5 +16,5 @@
 -- =============================================================================
 
 -- All orders per run (includes run_id to distinguish multiple simulation runs).
-SELECT run_id, placed_seq, robot_type, station, action, status, order_id
+SELECT run_id, placed_seq, robot_type, workstation_type, workstation_id, action, status, order_id
 FROM `queens_orders`;

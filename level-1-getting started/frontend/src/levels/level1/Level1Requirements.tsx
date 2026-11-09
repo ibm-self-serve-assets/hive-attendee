@@ -11,7 +11,7 @@ export const Level1Requirements: React.FC<LevelScreenProps> = ({ state }) => {
       <p className="mt-2 max-w-sm text-lg text-[#3A4A7A] leading-snug">
         {missing.length > 0
           ? 'These topics are not yet present in Confluent:'
-          : 'The Hive event topics could not be verified in Confluent.'}
+          : 'Hive Simulation event topics could not be verified in Confluent.'}
       </p>
       {missing.length > 0 && (
         <ul className="mt-2 font-mono text-sm text-[#031040] leading-snug">

@@ -28,7 +28,8 @@ SELECT
   run_id,
   order_id,
   MAX(robot_type) AS robot_type,
-  MAX(station) AS station,
+  MAX(workstation_type) AS workstation_type,
+  MAX(workstation_id) AS workstation_id,
   MAX(action) AS action,
   MAX(placed_seq) AS placed_seq,
   CASE MAX(lifecycle_stage)
@@ -44,7 +45,8 @@ FROM (
     run_id,
     payload.order_id AS order_id,
     payload.robot_type AS robot_type,
-    payload.station AS station,
+    payload.workstation_type AS workstation_type,
+    payload.workstation_id AS workstation_id,
     payload.action AS action,
     CAST(event_sequence AS BIGINT) AS placed_seq,
     1 AS lifecycle_stage
@@ -59,7 +61,8 @@ FROM (
     run_id,
     payload.order_id AS order_id,
     CAST(NULL AS STRING) AS robot_type,
-    CAST(NULL AS STRING) AS station,
+    CAST(NULL AS STRING) AS workstation_type,
+    CAST(NULL AS BIGINT) AS workstation_id,
     CAST(NULL AS STRING) AS action,
     CAST(NULL AS BIGINT) AS placed_seq,
     2 AS lifecycle_stage
@@ -74,7 +77,8 @@ FROM (
     run_id,
     payload.order_id AS order_id,
     payload.robot_type AS robot_type,
-    payload.station AS station,
+    payload.workstation_type AS workstation_type,
+    payload.workstation_id AS workstation_id,
     payload.action AS action,
     CAST(NULL AS BIGINT) AS placed_seq,
     3 AS lifecycle_stage

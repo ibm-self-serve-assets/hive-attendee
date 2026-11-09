@@ -22,7 +22,10 @@ _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
 # Topics that keep only the latest message per key and never expire. Every other
 # event topic keeps its events for 24 hours.
-STATE_TOPICS = {"simulation-state", "simulation-initialized"}
+STATE_TOPICS = {
+    "simulation-state", "simulation-initialized",
+    "gathering-state", "manufacturing-state", "assembly-state",
+}
 
 
 def clean_env(key: str) -> str:

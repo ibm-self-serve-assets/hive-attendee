@@ -30,7 +30,7 @@ CREATE TABLE `workstation_efficiency` (
   `stage`               STRING,           -- gathering | manufacturing | assembly
   `started_topic`       STRING,           -- Kafka topic the started event came from
   `completed_topic`     STRING,           -- Kafka topic the completed event came from
-  `station_id`          STRING,           -- station_id (gathering) or station_id
+  `workstation_type`    STRING,           -- gathering, manufacturing or assembly workstation type
   `output_type`         STRING,           -- what the job produced
   `started_at`          TIMESTAMP(3),     -- wall-clock time of the started event (UTC)
   `completed_at`        TIMESTAMP(3),     -- wall-clock time of the completed event (UTC)

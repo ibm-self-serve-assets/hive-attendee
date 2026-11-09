@@ -317,7 +317,7 @@ _http(
 
 ([`register_schemas.py`](scripts/register_schemas.py) sends each call with `urllib`; `quoted` is the subject name made safe for a URL.)
 
-- **`subject: <topic>-value`** Each topic returned by the Simulation server's `GET /v1/schemas` endpoint gets one subject named after it, with `-value` added: `gathering-started` becomes `gathering-started-value`. The `-value` part means the schema describes the event itself (the message *value*). The message key is just the plain-text `simulation_id`, so it has no schema. There are 14 subjects, one per topic.
+- **`subject: <topic>-value`** Each topic returned by the Simulation server's `GET /v1/schemas` endpoint gets one subject named after it, with `-value` added: `gathering-started` becomes `gathering-started-value`. The `-value` part means the schema describes the event itself (the message *value*). The message key is plain text (the `simulation_id`, or for the three workstation `*-state` topics `<simulation_id>:<run_id>:<workstation_type>:<workstation_id>`), so it has no schema. There are 17 subjects, one per topic.
 - **`schema`** is the JSON Schema document the Simulation server publishes for that topic. It lists every field of the event, its type, which fields are required and which may be empty. It is the exact schema the Simulation uses to check each event before writing it, so what you register is always what the server sends.
 - **`schemaType: "JSON"`** tells Schema Registry the schema is a JSON Schema. Schema Registry also supports Avro and Protobuf, but the Simulation writes JSON events.
 - **`compatibility: BACKWARD_TRANSITIVE`** is the rule Schema Registry applies whenever someone adds a new version of the subject. It is set *before* the first version, so the rule covers every version. Your dashboard and Flink replay topics from the very beginning, and `simulation-state` is kept forever, so every old event must stay readable with the newest schema. This rule makes Schema Registry refuse any new version that would break that.
@@ -372,7 +372,7 @@ Open your browser at **`http://localhost:5174`** (or the port displayed in your 
 
 ## Step 7: Verification & Next Steps
 
-When the dashboard loads, you will see the **Hive Robotics** interface.  The connection status indicator and **level selector dropdown** will be visible in the top-right.  As you advance through the workshop, you will use a Level selctor to activate each level. Automated validation tests will verify that your stream processing jobs and data pipelines are properly configured and running.  Once those tests pass, you will gain access to the level.
+When the dashboard loads, you will see the **The Hive** interface.  The connection status indicator and **level selector dropdown** will be visible in the top-right.  As you advance through the workshop, you will use a Level selctor to activate each level. Automated validation tests will verify that your stream processing jobs and data pipelines are properly configured and running.  Once those tests pass, you will gain access to the level.
 
 If you see a **Level 1 is locked** warning like the one below instead, one or more of your topics are missing from your Confluent Cloud cluster. Re-run [Step 4](#step-4-provision-your-kafka-topics-and-register-their-schemas) and the warning clears once every topic exists. If **Run** still doesn't work afterwards, ask your instructor to reset your simulation.
 
