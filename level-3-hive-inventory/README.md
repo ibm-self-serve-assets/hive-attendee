@@ -362,7 +362,7 @@ You may be asking yourself, what is the motivating force behind manufacturing th
 Level 4 introduces the Queen and her orders for additional workers. The Queen can place orders for new Workers plus assign them to specific tasks. And as you guessed, Kafka events are generated to let us know about the Queen's requests:
 
 - `queen-worker-ordered`
-- `worker-assigned`
+- `queen-worker-assigned`
 
 Your task in Level 4 will be aggregating these into a new `queens_orders` topic to track progress of this activity. Using Flink again, you will turn those events into a live queue that the assembly line works through, first in first out.  
 

@@ -47,6 +47,7 @@ export const Level1Screen: React.FC<LevelScreenProps> = ({ state }) => {
               })}
             </div>
           </div>
+          <EventPanel title="Simulation events" events={events?.simulation ?? []} />
           <EventPanel title="Resource events" events={events?.gathering ?? []} />
         </section>
 

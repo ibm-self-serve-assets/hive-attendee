@@ -158,6 +158,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                 })}
               </div>
             </div>
+            <EventPanel title="Simulation events" events={events?.simulation ?? []} defaultOpen={false} />
             <EventPanel title="Resource events" events={events?.gathering ?? []} defaultOpen={false} />
           </section>
         </div>
@@ -347,6 +348,7 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
               </div>
             </div>
             <EventPanel title="Assembly events" events={events?.assembly ?? []} defaultOpen={false} />
+            <EventPanel title="Queen events" events={events?.queen ?? []} defaultOpen={false} />
           </section>
         </div>
 

@@ -13,7 +13,7 @@ REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
 
 _venv_ok=false
 if [ -f "$VENV_DIR/bin/python" ]; then
-  _shebang="$(head -1 "$VENV_DIR/bin/pip" 2>/dev/null || true)"
+  _shebang="$(head -3 "$VENV_DIR/bin/pip" 2>/dev/null || true)"
   if [[ "$_shebang" == *"$VENV_DIR"* ]]; then
     _venv_ok=true
   else
@@ -37,8 +37,10 @@ echo "Starting Hive Dashboard Backend on http://localhost:8001 ..."
 echo "Console shows only major events and errors. Full logs: $SCRIPT_DIR/../logs/hive-backend.log"
 echo ""
 cd "$SCRIPT_DIR/.."
+# --timeout-graceful-shutdown: the dashboard's open /api/stream connection would otherwise keep
+# a reload waiting (about 77 s seen), and the Kafka consumers only leave their group after that.
 PYTHONPATH="$SCRIPT_DIR/..:$SCRIPT_DIR" "$UVICORN" backend.app:app \
-  --host localhost --port 8001 --reload \
+  --host localhost --port 8001 --reload --timeout-graceful-shutdown 3 \
   --log-config "$SCRIPT_DIR/log_config.json" || {
   echo ""
   echo "ERROR: Backend exited. Check the output above."

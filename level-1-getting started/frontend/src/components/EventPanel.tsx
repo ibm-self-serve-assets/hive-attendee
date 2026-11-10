@@ -49,6 +49,13 @@ export function describeEvent(ev: HiveEvent): string {
       return `${station} → ${titleCase(String(p.output_type ?? ''))} (uses ${fmtCounts(p.inputs)})`;
     case 'assembly.completed':
       return `${titleCase(String(p.output_type ?? ''))} +${asNum(p.quantity) || 1} from ${station}`;
+    case 'queen.worker.ordered':
+    case 'queen.worker.assigned':
+      return `${titleCase(String(p.robot_type ?? ''))} → ${station} (${p.action === 'add' ? 'new workstation' : 'upgrade'})`;
+    case 'simulation.state':
+      return sentenceCase(String(p.lifecycle_status ?? ''));
+    case 'simulation.initialized':
+      return 'Simulation configured';
     default:
       return Object.keys(p).length ? sentenceCase(Object.keys(p).join(', ')) : '';
   }
@@ -213,8 +220,13 @@ export const EventPanel: React.FC<EventPanelProps> = ({ title, events, defaultOp
             <ul>
               {events.map((ev) => (
                 <li key={ev.event_id} className="border-b border-[#EEF3FA] last:border-b-0">
+                  {/* Open on mouse down, not click: new events are inserted at the top of the
+                      list every few hundred ms, so a row can move between mouse down and mouse
+                      up, and the browser then sends no click to the button. Keyboard activation
+                      (Enter/Space) still arrives as a click with detail 0. */}
                   <button
-                    onClick={() => setSelected(ev)}
+                    onMouseDown={(e) => e.button === 0 && setSelected(ev)}
+                    onClick={(e) => e.detail === 0 && setSelected(ev)}
                     className="w-full flex gap-3 px-4 py-2.5 text-left hover:bg-[#F8FAFD]"
                   >
                     <span className="font-mono text-[11px] text-[#57606a] tabular-nums shrink-0 pt-0.5">

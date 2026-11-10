@@ -29,7 +29,7 @@ export interface HiveEvent {
   payload: Record<string, unknown>;
 }
 
-export type EventSection = 'gathering' | 'manufacturing' | 'assembly';
+export type EventSection = 'simulation' | 'gathering' | 'manufacturing' | 'assembly' | 'queen';
 
 /** A plain-language connection problem reported by the backend (backend/connection_issues.py). */
 export interface ConnectionIssue {
@@ -162,7 +162,7 @@ export const EMPTY_STATE: DashboardState = {
   assembly_inputs: {},
   job_durations: {},
   inventory: { resource: {}, part: {} },
-  events: { gathering: [], manufacturing: [], assembly: [] },
+  events: { simulation: [], gathering: [], manufacturing: [], assembly: [], queen: [] },
   event_topics_ready: false,
   event_topics_missing: [],
   workstation_efficiency_ready: false,

@@ -31,7 +31,7 @@ SCRIPT="$SCRIPT_DIR/register_schemas.py"
 # ── 1. Create venv (recreate if the interpreter shebang is stale) ────────────
 _venv_ok=false
 if [ -f "$VENV_DIR/bin/python" ]; then
-  _shebang="$(head -1 "$VENV_DIR/bin/pip" 2>/dev/null || true)"
+  _shebang="$(head -3 "$VENV_DIR/bin/pip" 2>/dev/null || true)"
   if [[ "$_shebang" == *"$VENV_DIR"* ]]; then
     _venv_ok=true
   else

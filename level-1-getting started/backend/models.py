@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 
 class EventEnvelope(BaseModel):
     """Minimal envelope — resilient to schema variations and legacy messages."""
-    event_id: str = Field(default_simulation=lambda: str(uuid.uuid4()))
+    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str = ""
     simulation_id: Optional[str] = None
     server_epoch: Optional[str] = None
@@ -13,7 +13,7 @@ class EventEnvelope(BaseModel):
     event_sequence: int = 0
     sim_time_minutes: int = 0
     occurred_at: Optional[str] = None
-    payload: Dict[str, Any] = Field(default_simulation=dict)
+    payload: Dict[str, Any] = Field(default_factory=dict)
 
     # Optional envelope fields present on some events
     state_revision: Optional[int] = None

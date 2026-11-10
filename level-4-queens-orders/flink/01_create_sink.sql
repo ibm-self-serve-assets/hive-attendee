@@ -10,7 +10,7 @@
 --     OPEN         queen-worker-ordered     the Queen placed the order
 --     IN_ASSEMBLY  assembly-started        a robot is being built for it
 --                                          (the order has left the queue)
---     ASSIGNED     worker-assigned    the finished robot was assigned
+--     ASSIGNED     queen-worker-assigned    the finished robot was assigned
 --
 -- SCHEMA DESIGN
 --   robot_type : 'gatherer' | 'engineer' | 'builder'

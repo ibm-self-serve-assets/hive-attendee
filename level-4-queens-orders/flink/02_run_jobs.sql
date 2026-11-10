@@ -6,8 +6,8 @@
 -- one row per order, from three event streams:
 --
 --     queen-worker-ordered   -> OPEN
---     assembly-started      -> IN_ASSEMBLY
---     worker-assigned  -> ASSIGNED
+--     assembly-started       -> IN_ASSEMBLY
+--     queen-worker-assigned  -> ASSIGNED
 --
 -- Events are grouped by order_id; the furthest stage reached is the order's
 -- status. The dashboard queue shows orders with status = 'OPEN'.
@@ -82,7 +82,7 @@ FROM (
     payload.action AS action,
     CAST(NULL AS BIGINT) AS placed_seq,
     3 AS lifecycle_stage
-  FROM `worker-assigned`
+  FROM `queen-worker-assigned`
   WHERE payload.order_id IS NOT NULL
 
 )

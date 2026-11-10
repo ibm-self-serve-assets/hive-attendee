@@ -168,6 +168,7 @@ export const Level2Screen: React.FC<LevelScreenProps> = ({ state }) => {
               })}
             </div>
           </div>
+          <EventPanel title="Simulation events" events={events?.simulation ?? []} />
           <EventPanel title="Resource events" events={events?.gathering ?? []} />
         </section>
 

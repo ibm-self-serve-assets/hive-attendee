@@ -4,7 +4,7 @@
 
 You are getting closer to implementing your AI Queen.  First, you need to add logic to integrate your queen with the other systems in your hive.  The **Queen** decides which new Worker robots are required to improve the Hive and in what order. And she does this by publishing an `queen-worker-ordered` event.  You may have noticed this event earlier when you intially provisioned all the events provided by the Hive Simulation server.
 
-**The Problem:** The Queen's order for a new Worker (`queen-worker-ordered`) is separate from the `assembly-started` and `worker-assigned` events.  So there is no single event says "here is the **Queen's Worker Order** queue right now.  To know what is waiting to be built, every event consumer would have to cache every order and subtract the ones already in assembly or assigned, which means also tracking the assembly status of Worker robots in the Assembly process.
+**The Problem:** The Queen's order for a new Worker (`queen-worker-ordered`) is separate from the `assembly-started` and `queen-worker-assigned` events.  So there is no single event says "here is the **Queen's Worker Order** queue right now.  To know what is waiting to be built, every event consumer would have to cache every order and subtract the ones already in assembly or assigned, which means also tracking the assembly status of Worker robots in the Assembly process.
 
 **Your Objective:** Use Apache Flink to fold these events into a `queens_orders` table with one row per order.  Your Hive Dashboard can then read that table to render a **Worker Order Queue**.
 
@@ -18,7 +18,7 @@ The Queen can order three kinds of **Workers**.  Each order names the workstatio
 | **Engineer** | Upgrade up a workstation | Manufacturing or assembly stations only | `upgrade` |
 | **Builder** | Adds a new workstation | Manufacturing or Assembly | `add` |
 
-> **Not wired up yet:** a finished robot is assigned to its order (`worker-assigned`), but the assignment does not change the station yet.  The dashboard therefore shows the queue and its status changes, and the stations keep their starting tiers.
+> **Not wired up yet:** a finished robot is assigned to its order (`queen-worker-assigned`), but the assignment does not change the station yet.  The dashboard therefore shows the queue and its status changes, and the stations keep their starting tiers.
 
 ### New Kafka Topics and Table
 
@@ -27,14 +27,14 @@ Your Hive Simulation includes these two topics:
 | Topic | Written when |
 |---|---|
 | `queen-worker-ordered` | The Queen places an order. Carries `order_id`, `robot_type`, `workstation_type`, `workstation_id`, `action`. |
-| `worker-assigned` | A robot finished assembly and was assigned. `causation_id` is the id of the `assembly-completed` event. |
+| `queen-worker-assigned` | A robot finished assembly and was assigned. `causation_id` is the id of the `assembly-completed` event. |
 
 Note that we must also track when the Queen's orders have been processed.  The `assembly-started` topic triggers the removal of an order from the open order queue.  So your Flink SQL must process these 3 topics to track status of the Queen's order queue:
 
 ```
-queen-worker-ordered ────┐
-assembly-started ───────┼──► Flink GROUP BY order_id ───►  queens_orders
-worker-assigned ───┘   (highest lifecycle_stage wins)  (upsert changelog)
+queen-worker-ordered  ───┐
+assembly-started      ───┼──► Flink GROUP BY order_id ───►  queens_orders
+queen-worker-assigned ───┘   (highest lifecycle_stage wins)  (upsert changelog)
 ```
 
 Flink gives every event a `lifecycle_stage`, groups the events by `order_id`, and the highest `lifecycle_stage` seen for an order becomes its status:
@@ -43,7 +43,7 @@ Flink gives every event a `lifecycle_stage`, groups the events by `order_id`, an
 |---|---|---|
 | `queen-worker-ordered` | 1 | `OPEN` |
 | `assembly-started` (with an `order_id`) | 2 | `IN_ASSEMBLY` |
-| `worker-assigned` | 3 | `ASSIGNED` |
+| `queen-worker-assigned` | 3 | `ASSIGNED` |
 
 ---
 
@@ -51,7 +51,7 @@ Flink gives every event a `lifecycle_stage`, groups the events by `order_id`, an
 
 * **Commands become facts.** The Queen does not edit a queue.  She publishes `queen-worker-ordered` events, and each is a permanent record of what she decided and when.
 * **State is derived.** The queue is a *projection* of those events.  Flink holds the running state and emits the latest row per order, exactly like the inventory balance in Level 3, but keyed by `order_id` instead of by item.
-* **Anyone can build their own view.** The dashboard reads `queens_orders`, but a different team could read the same `queen-worker-ordered` and `worker-assigned` topics and build an audit trail or a fairness report, without any change to the Simulation.
+* **Anyone can build their own view.** The dashboard reads `queens_orders`, but a different team could read the same `queen-worker-ordered` and `queen-worker-assigned` topics and build an audit trail or a fairness report, without any change to the Simulation.
 
 ---
 

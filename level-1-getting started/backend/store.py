@@ -42,8 +42,9 @@ MANUFACTURING_STATIONS = [
 PART_IDS = ("actuator", "battery", "chassis", "electronics")
 
 # Recent raw events kept per dashboard section (newest first), keyed by event_type prefix.
-EVENT_LOG_CATEGORIES = ("gathering", "manufacturing", "assembly")
-EVENT_LOG_LIMIT = 100
+# "queen" covers queen.worker.ordered and queen.worker.assigned.
+EVENT_LOG_CATEGORIES = ("simulation", "gathering", "manufacturing", "assembly", "queen")
+EVENT_LOG_LIMIT = 250
 
 
 class DashboardStore:
@@ -121,6 +122,8 @@ class DashboardStore:
 
         # Recent events per section, newest first (raw envelopes for the event panels)
         self.events: Dict[str, list] = {c: [] for c in EVENT_LOG_CATEGORIES}
+        # Event types already warned about for having no event panel (warn once per type).
+        self._unlogged_event_types: set = set()
 
         # Level 1 gate: every event topic listed by the Simulation server (GET /v1/schemas) exists in Confluent.
         # `event_topics_missing` lists the absent topic names (empty until the first check completes).
@@ -250,6 +253,12 @@ class DashboardStore:
             log = self.events[category]
             log.insert(0, env.model_dump())
             del log[EVENT_LOG_LIMIT:]
+        elif et not in self._unlogged_event_types:
+            self._unlogged_event_types.add(et)
+            logger.warning(
+                f"Store: event type '{et}' has no event panel, so it is not logged. "
+                f"Add '{category}' to EVENT_LOG_CATEGORIES (store.py) and a panel in the level screens."
+            )
 
         if et == "simulation.state":
             prev_status = self.lifecycle_status
