@@ -713,7 +713,7 @@ def _raise_for_server_error(r: httpx.Response) -> None:
         raise HTTPException(status_code=r.status_code, detail=err_body)
 
 
-# The Queen's queue is not kept here: the server emits queen-worker-ordered / worker-assigned events,
+# The Queen's queue is not kept here: the server emits queen-worker-ordered / queen-worker-assigned events,
 # Flink folds them into the queens_orders topic, and QueensOrdersConsumer feeds the store.
 # These endpoints only forward the Queen's commands; the dashboard updates from the topic.
 @app.post("/api/order-worker-beee")

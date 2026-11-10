@@ -25,6 +25,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isLive = stream_health === 'live';
   const isExpired = lifecycle_status === 'expired';
   const isStopped = lifecycle_status === 'stopped';
+  // Paused part-way through a run: offer Restart (from zero) and Start (resume).
+  const isPaused = !running && sim_time_minutes > 0;
   const connectionFailed = state.connection_status === 'failed';
   const hasSimulation = Boolean(active_simulation_id) && !connectionFailed;
   const hasState = stream_health !== 'awaiting_events' || hasSimulation;
@@ -122,14 +124,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ) : (
               <div className="flex gap-2">
                 <button
-                  onClick={() => onSendCommand(running ? 'stop' : 'start')}
+                  onClick={() => (isPaused ? onSendCommand('restart', { start: true }) : onSendCommand(running ? 'stop' : 'start'))}
                   disabled={isCommandPending || !hasSimulation}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded text-sm font-bold bg-[#2850B8] hover:bg-[#3460C8] text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded text-sm font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed transition ${
+                    isPaused ? 'bg-[#1A3080] hover:bg-[#243D96]' : 'bg-[#2850B8] hover:bg-[#3460C8]'
+                  }`}
                 >
                   {running ? (
                     <>
                       <img src="/icons/svg/simulation_controls_pause.svg" width={14} height={14} alt="Stop" />
                       <span>Stop</span>
+                    </>
+                  ) : isPaused ? (
+                    <>
+                      <img src="/icons/svg/simulation_controls_start.svg" width={14} height={14} alt="Restart" />
+                      <span>Restart</span>
                     </>
                   ) : (
                     <>
@@ -146,6 +155,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <img src="/icons/svg/simulation_controls_pause.svg" width={14} height={14} alt="Pause" />
                     <span>Pause</span>
+                  </button>
+                )}
+                {isPaused && (
+                  <button
+                    onClick={() => onSendCommand('start')}
+                    disabled={isCommandPending || !hasSimulation}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded text-sm font-bold bg-[#2850B8] hover:bg-[#3460C8] text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <img src="/icons/svg/simulation_controls_start.svg" width={14} height={14} alt="Start" />
+                    <span>Start</span>
                   </button>
                 )}
               </div>

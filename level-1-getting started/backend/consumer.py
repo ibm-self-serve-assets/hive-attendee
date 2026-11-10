@@ -56,10 +56,15 @@ def make_event_deserializer(
     return JSONDeserializer(schema_str=None, schema_registry_client=schema_registry_client)
 
 
-def _make_group_id(prefix: str, store: DashboardStore) -> str:
-    sim_id_short = (store.active_simulation_id or "default")[:8]
+def _make_group_id(name: str, store: DashboardStore) -> str:
+    """Consumer group id: <name>-<attendee>, e.g. events-hive-003 for ATTENDEE_ID queen-003.
+
+    One stable group per consumer. A leading "queen-" in the attendee id is shown as "hive-".
+    """
     attendee_short = (store.attendee_id or "attendee").split("@")[0].replace(".", "-")[:16]
-    return f"hive-{prefix}-{attendee_short}-{sim_id_short}"
+    if attendee_short.startswith("queen-"):
+        attendee_short = "hive-" + attendee_short[len("queen-"):]
+    return f"{name}-{attendee_short}"
 
 
 class EventConsumerManager:
@@ -108,9 +113,11 @@ class EventConsumerManager:
             self._consumer_task.cancel()
         if self._kafka_consumer:
             try:
+                # close() sends LeaveGroup. If it does not happen, the broker keeps this
+                # member until its session expires and the next consumer in the group waits.
                 self._kafka_consumer.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Event consumer could not leave its group cleanly: {e}")
             self._kafka_consumer = None
         logger.info("Event consumer stopped.", extra=MAJOR)
 
@@ -123,8 +130,11 @@ class EventConsumerManager:
         return env
 
     async def _run(self):
-        if not (KAFKA_AVAILABLE and self.bootstrap_servers and self.api_key and self.api_secret and self.topics):
-            logger.info("Kafka consumer not started: missing credentials or topics.")
+        if not (KAFKA_AVAILABLE and self.bootstrap_servers and self.api_key and self.api_secret):
+            logger.info("Event consumer not started: Kafka client or credentials are missing.")
+            return
+        if not self.topics:
+            logger.info("Event consumer waiting: no topics yet. It starts once the Simulation is connected.")
             return
         if self.deserializer is None:
             logger.warning("Kafka consumer not started: Schema Registry is not configured.")
@@ -143,9 +153,23 @@ class EventConsumerManager:
             "group.id": group_id,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": True,
+            # The group id is stable, so a backend restart (e.g. uvicorn --reload) rejoins the
+            # same group. If the old process did not leave cleanly, the broker holds the
+            # partitions until its session expires (librdkafka default: 45 s) and nothing is
+            # consumed meanwhile. A short session makes that gap a few seconds.
+            "session.timeout.ms": 10000,
         }
         self._kafka_consumer = ConfluentConsumer(conf, logger=kafka_logger)
-        self._kafka_consumer.subscribe(self.topics)
+        joined_at = time.monotonic()
+
+        def on_assign(consumer, partitions):
+            consumer.assign(partitions)
+            logger.info(
+                f"Kafka consumer {group_id}: {len(partitions)} partitions assigned "
+                f"{time.monotonic() - joined_at:.1f}s after joining the group"
+            )
+
+        self._kafka_consumer.subscribe(self.topics, on_assign=on_assign)
         topic_counts: dict = {}
         last_summary = time.monotonic()
 
@@ -243,7 +267,7 @@ class CalculatedValuesConsumer:
             logger.info("CalculatedValues consumer not started: missing credentials.")
             return
 
-        group_id = _make_group_id("cv", self.store)
+        group_id = _make_group_id("efficiency", self.store)
         logger.info(f"CalculatedValues consumer group: {group_id}, topic: {self.topic}")
 
         conf = {
@@ -361,7 +385,7 @@ class InventoryBalancesConsumer:
             logger.info("InventoryBalances consumer not started: missing credentials.")
             return
 
-        group_id = _make_group_id("inv", self.store)
+        group_id = _make_group_id("inventory", self.store)
         logger.info(f"InventoryBalances consumer group: {group_id}, topics: {self.topics}")
 
         conf = {
@@ -448,7 +472,7 @@ class QueensOrdersConsumer:
     """
 
     # Used in the Kafka group id and in log messages; the parts consumer overrides them.
-    group_prefix = "ord"
+    group_prefix = "orders"
     name = "QueensOrders"
 
     def __init__(
@@ -577,7 +601,7 @@ class PartsPriorityQueueConsumer(QueensOrdersConsumer):
     the parts are kept, in `store.parts_by_run`, so the order cards can show "Parts required".
     """
 
-    group_prefix = "prt"
+    group_prefix = "parts-priority"
     name = "PartsPriorityQueue"
 
     def __init__(self, *args, topic: str = "parts_priority_queue", **kwargs):
