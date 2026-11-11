@@ -12,6 +12,9 @@ interface SidebarProps {
   isReady?: boolean;
 }
 
+/** Selectable Simulation speeds (Level 4). The Simulation server accepts exactly these. */
+const SIM_SPEEDS = [1, 5, 10];
+
 export const Sidebar: React.FC<SidebarProps> = ({
   state,
   isCommandPending,
@@ -183,6 +186,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="font-bold font-mono text-white text-xl tabular-nums tracking-tight">
               {hasState ? fmtSimTime(sim_time_minutes) : '--'}
             </div>
+          </section>
+        )}
+
+        {/* ── Simulation speed (Level 4) ── */}
+        {showControls && levelId === 'level-4' && (
+          <section>
+            <label htmlFor="sim-speed-select" className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
+              <img src="/icons/svg/simulation_speed.svg" width={24} height={24} alt="" className="opacity-70" />
+              <span>Simulation speed</span>
+            </label>
+            <select
+              id="sim-speed-select"
+              value={state.sim_speed ?? 1}
+              onChange={(e) => onSendCommand('speed', { speed: Number(e.target.value) })}
+              disabled={isCommandPending || !hasSimulation || isExpired}
+              className="w-full rounded border border-[#1A2760] bg-[#0A1A55] text-white text-sm font-bold px-3 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {SIM_SPEEDS.map((speed) => (
+                <option key={speed} value={speed}>
+                  {speed}x
+                </option>
+              ))}
+            </select>
           </section>
         )}
 

@@ -69,6 +69,8 @@ export interface DashboardState {
   run_id: string | null;
   run_generation: number;
   sim_time_minutes: number;
+  /** Simulation speed: 1, 5 or 10 (times normal). Back to 1x on every restart. */
+  sim_speed: number;
   lifecycle_status: 'paused' | 'running' | 'stopped' | 'expired';
   running: boolean;
   /** The Queen's open queue: OPEN orders in the order they were placed (from queens_orders, Level 4). */
@@ -148,6 +150,7 @@ export const EMPTY_STATE: DashboardState = {
   run_id: null,
   run_generation: 0,
   sim_time_minutes: 0,
+  sim_speed: 1,
   lifecycle_status: 'paused',
   running: false,
   gathering_completed: {},

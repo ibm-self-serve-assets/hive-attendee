@@ -18,6 +18,11 @@ import {
 // Set to true to show the Gatherer/Engineer/Builder buttons and the "Add station" hexagons.
 const SHOW_ORDER_BUTTONS = false;
 
+// Station wrapper width and horizontal gap between stations. Without the order buttons,
+// the wrapper hugs the 50px hexagon so the visible gap between hexagons is 25px.
+const STATION_WIDTH = SHOW_ORDER_BUTTONS ? 80 : 50;
+const STATION_GAP = SHOW_ORDER_BUTTONS ? 12 : 25;
+
 const AddStationHexagon: React.FC<{ onClick?: () => void; disabled?: boolean; size?: number; title?: string }> = ({ onClick, disabled = false, size = 50, title = 'Add workstation (max 4)' }) => {
   const height = Math.round(size * 1.15);
   return (
@@ -202,11 +207,11 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       </div>
 
                       {/* Workstations row (up to 4) + Add button */}
-                      <div className="flex items-start justify-start gap-3 flex-wrap">
+                      <div className="flex items-start justify-start flex-wrap" style={{ columnGap: STATION_GAP, rowGap: 12 }}>
                         {slots.map((st) => {
                           const isMax = st.tier >= 3;
                           return (
-                            <div key={st.workstation_id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
+                            <div key={st.workstation_id} className="flex flex-col items-center gap-1.5" style={{ width: STATION_WIDTH }}>
                               <HexagonTierBadge
                                 tier={st.tier}
                                 blocked={blocked}
@@ -289,11 +294,11 @@ export const Level4Screen: React.FC<LevelScreenProps> = ({ state }) => {
                       </div>
 
                       {/* Workstations row (up to 4) + Add button */}
-                      <div className="flex items-start justify-start gap-3 flex-wrap">
+                      <div className="flex items-start justify-start flex-wrap" style={{ columnGap: STATION_GAP, rowGap: 12 }}>
                         {slots.map((st) => {
                           const isMax = st.tier >= 3;
                           return (
-                            <div key={st.workstation_id} className="flex flex-col items-center gap-1.5" style={{ width: 80 }}>
+                            <div key={st.workstation_id} className="flex flex-col items-center gap-1.5" style={{ width: STATION_WIDTH }}>
                               <HexagonTierBadge
                                 tier={st.tier}
                                 blocked={blocked}

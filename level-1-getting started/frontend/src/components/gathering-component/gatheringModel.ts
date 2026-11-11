@@ -1,10 +1,10 @@
-/** Clockwise reading order: upper-near, upper-far, lower-near, lower-far. */
+/** Fill order: upper-near (top-left), lower-near (bottom-left), upper-far (top-right), lower-far (bottom-right). */
 export type Count = 0 | 1 | 2 | 3;
 export type NodeIndex = 0 | 1 | 2 | 3;
 export type Counts = readonly [Count, Count, Count, Count];
 /** Decorative return-trip duration, in real seconds; not a production timer. */
 export const TRAVEL_SECONDS = { 1: 10, 2: 5, 3: 3 } as const;
-export const LABELS = ['upper near', 'upper far', 'lower near', 'lower far'] as const;
+export const LABELS = ['upper near', 'lower near', 'upper far', 'lower far'] as const;
 export interface AddRequest {
   index: NodeIndex;
   previousValue: Count;

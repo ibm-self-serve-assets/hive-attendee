@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="title">
+  <title id="title">Simulation speed</title>
+  <g stroke="#A3B0F0" stroke-width="4" stroke-linecap="round">
+    <path d="M6 48V44a26 26 0 0 1 52 0v4"/>
+    <path d="M6 42h6M13.6 25.6l4.2 4.2M32 18v6M50.4 25.6l-4.2 4.2M58 42h-6"/>
+  </g>
+  <path d="M28.4 39.3 43.7 28.4a1.8 1.8 0 0 1 2.5 2.5L35.3 46.2Z" fill="#A3B0F0"/>
+  <circle cx="32" cy="43" r="5" fill="#A3B0F0"/>
+</svg>

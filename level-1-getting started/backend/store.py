@@ -69,6 +69,10 @@ class DashboardStore:
         self.latest_sim_time_minutes: int = 0
         self.run_generation: int = 0
 
+        # Simulation speed (1, 5 or 10), as last confirmed by the Simulation server.
+        # Every restart goes back to 1x.
+        self.sim_speed: int = 1
+
         # lifecycle — from simulation.state
         self.lifecycle_status: str = "paused"
         self.running: bool = False
@@ -169,6 +173,7 @@ class DashboardStore:
     def reset(self) -> None:
         self.latest_sim_time_minutes = 0
         self.run_generation = 0
+        self.sim_speed = 1
         self.run_id = None
         self.lifecycle_status = "paused"
         self.running = False
@@ -464,6 +469,7 @@ class DashboardStore:
             "run_id": self.run_id,
             "run_generation": self.run_generation,
             "sim_time_minutes": self.latest_sim_time_minutes,
+            "sim_speed": self.sim_speed,
             "lifecycle_status": self.lifecycle_status,
             "running": self.running,
             "robot_queue": self.robot_queue,

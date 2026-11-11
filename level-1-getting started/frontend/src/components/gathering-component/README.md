@@ -28,9 +28,9 @@ export function CopperGathering() {
 
 ## Interaction and rules
 
-Circle order is **upper-near → upper-far → lower-near → lower-far**.
+Circle order is **upper-near (top-left) → lower-near (bottom-left) → upper-far (top-right) → lower-far (bottom-right)**.
 Each circle must reach 3 before the next circle can receive a Forager. Thus both
-upper circles must be full before the lower row unlocks. Capacity is 12 total.
+near circles must be full before the far circles unlock. Capacity is 12 total.
 Only the next eligible circle has an add button. It appears when that circle is
 hovered or its button receives keyboard focus. Touch devices show it persistently.
 Native buttons support Tab, Enter, and Space. Full and locked circles have no

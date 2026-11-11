@@ -4,7 +4,7 @@ import './Gathering.css';
 export type { AddRequest, Count, Counts, NodeIndex } from './gatheringModel';
 
 export interface GatheringProps {
-  /** Controlled counts, ordered upper-near, upper-far, lower-near, lower-far. */
+  /** Controlled counts, ordered upper-near (top-left), lower-near (bottom-left), upper-far (top-right), lower-far (bottom-right). */
   counts: Counts;
   /** Parent performs purchase/assignment and supplies updated counts. May be async. */
   onAdd?: (request: AddRequest) => void | Promise<void>;
@@ -21,12 +21,12 @@ export interface GatheringProps {
   className?: string;
   style?: CSSProperties;
 }
-const POSITIONS = [[280, 75], [480, 75], [280, 235], [480, 235]] as const;
+const POSITIONS = [[280, 75], [280, 235], [480, 75], [480, 235]] as const;
 // Return paths run from each circle toward the hive, reversing the drawn branches.
 const RETURN_PATHS = [
   'M280 75 C185 75 165 155 108 155',
-  'M480 75 H280 C185 75 165 155 108 155',
   'M280 235 C185 235 165 155 108 155',
+  'M480 75 H280 C185 75 165 155 108 155',
   'M480 235 H280 C185 235 165 155 108 155',
 ] as const;
 
@@ -54,8 +54,8 @@ export function Gathering({ counts, onAdd, disabled = false, readOnly = false, a
       <svg className="gathering__routes" viewBox="0 0 600 310" aria-hidden="true">
         <g fill="none" strokeWidth="5" strokeLinecap="round">
           <path d="M108 155 C165 155 185 75 280 75" stroke={counts[0] ? blue : inactive}/>
-          <path d="M280 75 H480" stroke={counts[1] ? blue : inactive}/>
-          <path d="M108 155 C165 155 185 235 280 235" stroke={counts[2] ? blue : inactive}/>
+          <path d="M280 75 H480" stroke={counts[2] ? blue : inactive}/>
+          <path d="M108 155 C165 155 185 235 280 235" stroke={counts[1] ? blue : inactive}/>
           <path d="M280 235 H480" stroke={counts[3] ? blue : inactive}/>
         </g>
         {active && counts.map((count, index) => count > 0 && (

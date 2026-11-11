@@ -98,6 +98,7 @@ export const App: React.FC = () => {
               ...prev,
               lifecycle_status: data.lifecycle_status,
               running: data.lifecycle_status === 'running',
+              ...(typeof data.simulation_speed === 'number' ? { sim_speed: data.simulation_speed } : {}),
             }));
           }
         } catch {

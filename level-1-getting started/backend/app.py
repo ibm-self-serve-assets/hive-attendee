@@ -463,6 +463,7 @@ async def _auto_connect():
                             store.active_simulation_id = sim_id
                             store.server_epoch = rst_data.get("server_epoch", store.server_epoch)
                             store.reset()
+                            store.sim_speed = rst_data.get("simulation_speed", 1)
                             store.lifecycle_status = rst_data.get("lifecycle_status", "paused")
                             store.running = False
                             # Set the new run_generation immediately so the consumer's
@@ -560,6 +561,7 @@ class ControlCommandRequest(BaseModel):
     command: str
     start: Optional[bool] = True
     expected_generation: Optional[int] = None
+    speed: Optional[int] = None  # only for command "speed": 1, 5 or 10
 
 
 class OrderRobotRequest(BaseModel):
@@ -588,8 +590,10 @@ async def send_control(
             "message": _connect_failure_message("WORKSHOP_ACCESS_TOKEN is not set in spec-shared/.env."),
         })
 
-    if req.command not in ("start", "pause", "stop", "restart"):
+    if req.command not in ("start", "pause", "stop", "restart", "speed"):
         raise HTTPException(status_code=422, detail="Invalid command")
+    if req.command == "speed" and req.speed not in (1, 5, 10):
+        raise HTTPException(status_code=422, detail="speed must be 1, 5 or 10")
 
     if not store.active_simulation_id:
         if req.command == "restart":
@@ -623,6 +627,8 @@ async def send_control(
         body["expected_generation"] = store.run_generation
     if req.command == "restart":
         body["start"] = req.start if req.start is not None else True
+    if req.command == "speed":
+        body["speed"] = req.speed
 
     async with httpx.AsyncClient(timeout=8.0) as client:
         r = await client.post(cmd_url, json=body, headers=headers)
@@ -636,7 +642,8 @@ async def send_control(
                     "message": _connect_failure_message("Failed to re-sync Simulation after server reload/restart"),
                 })
             target_cmd = "start" if (req.command == "restart" and req.start is not False) or req.command == "start" else req.command
-            return await _send_server_command(target_cmd)
+            # A re-synced Simulation is a fresh run at 1x, so a speed change still has to be applied.
+            return await _send_server_command(target_cmd, {"speed": req.speed} if req.command == "speed" else None)
 
         if r.status_code >= 400:
             try:
@@ -647,6 +654,8 @@ async def send_control(
 
         receipt = r.json()
         logger.info(f"Controls: '{req.command}' succeeded -> status='{receipt.get('lifecycle_status')}'", extra=MAJOR)
+        if "simulation_speed" in receipt:
+            store.sim_speed = receipt["simulation_speed"]
         if "lifecycle_status" in receipt:
             store.lifecycle_status = receipt["lifecycle_status"]
             store.running = (store.lifecycle_status == "running")
@@ -673,6 +682,8 @@ async def _send_server_command(command: str, body: Optional[Dict[str, Any]] = No
             raise HTTPException(status_code=r.status_code, detail=err_body)
 
         receipt = r.json()
+        if "simulation_speed" in receipt:
+            store.sim_speed = receipt["simulation_speed"]
         if "lifecycle_status" in receipt:
             store.lifecycle_status = receipt["lifecycle_status"]
             store.running = (store.lifecycle_status == "running")
