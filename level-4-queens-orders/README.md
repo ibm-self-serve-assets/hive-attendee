@@ -199,7 +199,14 @@ So if the Queen's open orders are one Gatherer, one Engineer and one Builder, in
 
 When assembly starts for the Gatherer, its row changes to `IN_ASSEMBLY`.  The parts stay on the row.
 
-> **How the order of the queue is used:** this level only shows the parts on each order.  Deciding which part to manufacture next is a separate function, not covered here.
+### How Parts are Prioritized for Manufacturing
+
+Parts manufacturing uses the Queen's queue for **demand-driven production**:
+
+1. **Next Robot First:** Manufacturing prioritizes the specific parts still missing for the first robot in the Queen's queue (Order #1).
+2. **Lookahead to Order #2:** If all parts needed for the first robot are already in stock or currently under manufacture, idle workstations immediately look ahead to the next order in line (Order #2) to build its parts.
+3. **Resource Priority:** Higher-priority orders get first claim on available raw materials (e.g., metals, copper, energy), preventing bottleneck starvation.
+4. **Balanced Fallback:** When the Queen's order queue is empty or all pending orders are fully covered, workstations fall back to balancing stock evenly across all part types.
 
 ### Run Scripts
 
